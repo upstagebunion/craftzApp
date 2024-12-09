@@ -32,11 +32,11 @@ const crearProducto = async (req, res) => {
 const editarProducto = async (req, res) => {
     try {
         const { id } = req.params;
-        const { nombre, descripcion, precio } = req.body;
+        const { nombre, descripcion, precio, stock } = req.body;
 
         const productoActualizado = await Producto.findByIdAndUpdate(
             id,
-            { nombre, descripcion, precio },
+            { nombre, descripcion, precio, stock },
             { new: true }
         );
 
