@@ -8,8 +8,9 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors({
-    origin: 'http://localhost:3000', // URL del frontend
+    origin: ['http://localhost:3000', 'https://craftzapp.craftzstore.com'], // URL del frontend
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
 }));
 app.use(express.json());
 app.use('/api/productos', productosRouter);
