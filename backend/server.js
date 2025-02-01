@@ -4,7 +4,7 @@ const cors = require('cors');
 const productosRouter = require('./app/routes/productos');
 const authRouter = require('./app/routes/auth');
 const ventasRoutes = require("./app/routes/ventas");
-require('dotenv').config();
+const config = require('./config');
 
 const app = express();
 app.use(cors({
@@ -18,7 +18,7 @@ app.use('/auth', authRouter);
 app.use("/api/ventas", ventasRoutes)
 
 // Conexión a MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
+mongoose.connect(config.mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 }).then(() => console.log('MongoDB conectado'))
@@ -26,7 +26,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 app.get('/', (req, res) => res.send('API funcionando'));
 
-const PORT = process.env.PORT || 5000;
+const PORT = config.port;
 app.listen(PORT, () => console.log(`Servidor corriendo en el puerto ${PORT}`));
 
 
