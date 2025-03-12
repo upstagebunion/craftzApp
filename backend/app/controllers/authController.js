@@ -1,4 +1,4 @@
-const Usuario = require('../models/Usuario');
+const Usuario = require('../models/usuariosModel');
 const jwt = require('jsonwebtoken');
 const config = require('../../config');
 
@@ -41,3 +41,21 @@ exports.login = async (req, res) => {
         res.status(500).json({ message: 'Error al iniciar sesión.' });
     }
 };
+
+exports.verificarToken = async (req, res) => {
+    const token = req.headers['authorization'];
+
+    if (!token) {
+        return res.status(401).json({ message: 'Acceso denegado. No se proporcionó un token.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, config.jwtSecret); // Verifica la validez del token
+        req.usuarioId = decoded.id; // Guarda el ID del usuario decodificado en la solicitud
+        return res.status(200).json({ message: 'token valido' });
+    } catch (error) {
+        return res.status(401).json({ message: 'Token inválido o expirado.', error });
+    }
+}
+
+

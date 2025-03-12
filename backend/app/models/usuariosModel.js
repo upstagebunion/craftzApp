@@ -2,9 +2,23 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
 const usuarioSchema = new mongoose.Schema({
-    nombre: { type: String, required: true },
-    correo: { type: String, unique: true, required: true },
-    password: { type: String, required: true },
+    nombre: {
+        type: String,
+        required: true 
+    },
+    correo: {
+        type: String,
+        unique: true,
+        required: true
+    },
+    password: {
+        type: String,
+        required: true
+    },
+    fbtoken: {
+        type: String,
+        required: false
+    }
 });
 
 // Antes de guardar, hashear la contraseña.

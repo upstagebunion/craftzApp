@@ -1,5 +1,5 @@
-const Venta = require("../models/venta");
-const Producto = require("../models/Producto"); // Importar modelo de producto para obtener los precios
+const Venta = require("../models/ventasModel");
+const Producto = require("../models/productosModel"); // Importar modelo de producto para obtener los precios
 
 exports.crearVenta = async (req, res) => {
     try {

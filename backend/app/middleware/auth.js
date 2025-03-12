@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const config = require('../../config');
 
 module.exports = (req, res, next) => {
     const token = req.header('Authorization');
@@ -6,7 +7,7 @@ module.exports = (req, res, next) => {
         return res.status(401).json({ message: 'Acceso no autorizado.' });
     }
     try {
-        const verified = jwt.verify(token, process.env.JWT_SECRET);
+        const verified = jwt.verify(token, config.jwtSecret);
         req.user = verified;
         req.userId = verified.id;
         next();
