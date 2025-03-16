@@ -4,22 +4,22 @@ const authMiddleware = require('../middleware/auth'); // Middleware de autentica
 const {
     listarProductos,
     crearProducto,
-    editarProducto,
+    actualizarProductos,
     eliminarProducto,
     agregarVariantes,
-    editarColor,
-    editarTalla,
-    editarVariante
+    agregarColor,
+    agregarTalla,
+    agregarVariante
 } = require('../controllers/productosController'); // Importamos los controladores
 
 // Rutas protegidas
 router.get('/', authMiddleware, listarProductos);
 router.post('/', authMiddleware, crearProducto);
-router.patch('/:id', authMiddleware, editarProducto);
+router.patch('/actualizar', authMiddleware, actualizarProductos);
 router.post('/:id/variantes', authMiddleware, agregarVariantes);
-router.patch('/:id/variantes/:variante', authMiddleware, editarVariante);
-router.patch('/:id/variantes/:variante/:color', authMiddleware, editarColor);
-router.patch('/:id/variantes/:variante/:color/:talla', authMiddleware, editarTalla);
+router.post('/:id/variante', authMiddleware, agregarVariante);
+router.post('/:id/:variante/color', authMiddleware, agregarColor);
+router.post('/:id/:variante/:color/talla', authMiddleware, agregarTalla);
 router.delete('/:id', authMiddleware, eliminarProducto);
 
 module.exports = router;

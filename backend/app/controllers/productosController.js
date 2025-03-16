@@ -122,7 +122,7 @@ const agregarVariantes = async (req, res) => {
 };
 
 // Editar producto
-const editarProducto = async (req, res) => {
+/*const editarProducto = async (req, res) => {
     try {
         const { productoId } = req.params.id;
         const {
@@ -161,130 +161,168 @@ const editarProducto = async (req, res) => {
         console.error("Error al editar producto:", error);
         res.status(500).json({ message: "Error al editar producto", error });
     }
-};
+};*/
 
-const editarVariante = async (req, res) => {
+const actualizarProductos = async (req, res) => {
     try {
-        const productoId = req.params.id;
-        const varianteId = req.params.variante;
-        const nuevoTipo = req.body;
+        const productosModificados = req.body; // Array de productos modificados
 
-        if (!productoId || !varianteId) {
-            return res.status(400).json({ message: "Producto ID y Variante ID son requeridos" });
+        if (!Array.isArray(productosModificados)) {
+            return res.status(400).json({ message: "Se esperaba un array de productos" });
         }
 
-        const producto = await Producto.findById(productoId);
-        if (!producto) {
-            return res.status(404).json({ message: "Producto no encontrado" });
+        // Recorremos cada producto modificado
+        for (const productoModificado of productosModificados) {
+            const { _id, ...datosActualizados } = productoModificado;
+
+            if (!_id) {
+                return res.status(400).json({ message: "Cada producto debe incluir un _id" });
+            }
+
+            // Buscamos el producto en la base de datos
+            const productoExistente = await Producto.findById(_id);
+
+            if (!productoExistente) {
+                return res.status(404).json({ message: `Producto con id ${_id} no encontrado` });
+            }
+
+            // Actualizamos solo los campos que han sido modificados
+            for (const [key, value] of Object.entries(datosActualizados)) {
+                if (value !== undefined) {
+                    productoExistente[key] = value;
+                }
+            }
+
+            // Guardamos los cambios
+            await productoExistente.save();
         }
 
-        const variante = producto.variantes.id(varianteId);
-        if (!variante) {
-            return res.status(404).json({ message: "Variante no encontrada" });
-        }
-
-        variante.tipo = nuevoTipo || variante.tipo;
-
-        await producto.save();
-
-        res.status(200).json({ message: "Variante actualizada exitosamente", producto });
+        res.status(200).json({ message: "Productos actualizados exitosamente" });
     } catch (error) {
-        console.error("Error al editar variante:", error);
-        res.status(500).json({ message: "Error al editar variante", error });
+        console.error(error);
+        res.status(500).json({ message: "Error al actualizar los productos", error });
     }
 };
 
-const editarColor = async (req, res) => {
+const agregarVariante = async (req, res) => {
     try {
-        const productoId = req.params.id;
-        const varianteId = req.params.variante;
-        const colorId = req.params.color;
-        const {
-            nuevoColor,
-            nuevoStock,
-            nuevoPrecio
-        } = req.body;
-
-        if (!productoId || !varianteId || !colorId) {
-            return res.status(400).json({ message: "Producto ID, Variante ID y Color ID son requeridos" });
-        }
-
-        const producto = await Producto.findById(productoId);
-        if (!producto) {
-            return res.status(404).json({ message: "Producto no encontrado" });
-        }
-
-        const variante = producto.variantes.id(varianteId);
-        if (!variante) {
-            return res.status(404).json({ message: "Variante no encontrada" });
-        }
-
-        const color = variante.colores.id(colorId);
-        if (!color) {
-            return res.status(404).json({ message: "Color no encontrado" });
-        }
-
-        color.color = nuevoColor || color.color;
-        color.stock = nuevoStock !== undefined ? nuevoStock : color.stock;
-        color.precio = nuevoPrecio !== undefined ? nuevoPrecio : color.precio;
-
-        await producto.save();
-
-        res.status(200).json({ message: "Color actualizado exitosamente", producto });
+      const { id } = req.params; // ID del producto
+      const { tipo } = req.body; // Datos de la nueva variante
+  
+      // Buscar el producto en la base de datos
+      const producto = await Producto.findById(id);
+  
+      if (!producto) {
+        return res.status(404).json({ message: "Producto no encontrado" });
+      }
+  
+      // Crear la nueva variante
+      const nuevaVariante = {
+        tipo,
+        colores: [],
+      };
+  
+      // Agregar la variante al producto
+      producto.variantes.push(nuevaVariante);
+  
+      // Guardar el producto actualizado
+      await producto.save();
+  
+      // Devolver el producto actualizado
+      res.status(200).json(producto);
     } catch (error) {
-        console.error("Error al editar color:", error);
-        res.status(500).json({ message: "Error al editar color", error });
+      console.error(error);
+      res.status(500).json({ message: "Error al agregar la variante", error });
     }
-};
+  };
 
-const editarTalla = async (req, res) => {
+  const agregarColor = async (req, res) => {
     try {
-        const productoId = req.params.id;
-        const varianteId = req.params.variante;
-        const colorId = req.params.color;
-        const tallaId = req.params.talla;
-        const {
-            nuevaTalla,
-            nuevoStock,
-            nuevoPrecio
-        } = req.body;
-
-        if (!productoId || !varianteId || !colorId || !tallaId) {
-            return res.status(400).json({ message: "Producto ID, Variante ID, Color ID y Talla ID son requeridos" });
-        }
-
-        const producto = await Producto.findById(productoId);
-        if (!producto) {
-            return res.status(404).json({ message: "Producto no encontrado" });
-        }
-
-        const variante = producto.variantes.id(varianteId);
-        if (!variante) {
-            return res.status(404).json({ message: "Variante no encontrada" });
-        }
-
-        const color = variante.colores.id(colorId);
-        if (!color) {
-            return res.status(404).json({ message: "Color no encontrado" });
-        }
-
-        const talla = color.tallas.id(tallaId);
-        if (!talla) {
-            return res.status(404).json({ message: "Talla no encontrada" });
-        }
-
-        talla.talla = nuevaTalla || talla.talla;
-        talla.stock = nuevoStock !== undefined ? nuevoStock : talla.stock;
-        talla.precio = nuevoPrecio !== undefined ? nuevoPrecio : talla.precio;
-
-        await producto.save();
-
-        res.status(200).json({ message: "Talla actualizada exitosamente", producto });
+      const { id, variante } = req.params; // ID del producto y ID de la variante
+      const { color, stock, precio } = req.body; // Datos del nuevo color
+  
+      // Buscar el producto en la base de datos
+      const producto = await Producto.findById(id);
+  
+      if (!producto) {
+        return res.status(404).json({ message: "Producto no encontrado" });
+      }
+  
+      // Buscar la variante en el producto
+      const varianteExistente = producto.variantes.id(variante);
+  
+      if (!varianteExistente) {
+        return res.status(404).json({ message: "Variante no encontrada" });
+      }
+  
+      // Crear el nuevo color
+      const nuevoColor = {
+        color,
+        stock,
+        precio,
+        tallas: [],
+      };
+  
+      // Agregar el color a la variante
+      varianteExistente.colores.push(nuevoColor);
+  
+      // Guardar el producto actualizado
+      await producto.save();
+  
+      // Devolver el producto actualizado
+      res.status(200).json(producto);
     } catch (error) {
-        console.error("Error al editar talla:", error);
-        res.status(500).json({ message: "Error al editar talla", error });
+      console.error(error);
+      res.status(500).json({ message: "Error al agregar el color", error });
     }
-};
+  };
+
+  const agregarTalla = async (req, res) => {
+    try {
+      const { id, variante, color } = req.params; // ID del producto, variante y color
+      const { talla, stock, precio } = req.body; // Datos de la nueva talla
+  
+      // Buscar el producto en la base de datos
+      const producto = await Producto.findById(id);
+  
+      if (!producto) {
+        return res.status(404).json({ message: "Producto no encontrado" });
+      }
+  
+      // Buscar la variante en el producto
+      const varianteExistente = producto.variantes.id(variante);
+  
+      if (!varianteExistente) {
+        return res.status(404).json({ message: "Variante no encontrada" });
+      }
+  
+      // Buscar el color en la variante
+      const colorExistente = varianteExistente.colores.id(color);
+  
+      if (!colorExistente) {
+        return res.status(404).json({ message: "Color no encontrado" });
+      }
+  
+      // Crear la nueva talla
+      const nuevaTalla = {
+        talla,
+        stock,
+        precio,
+      };
+  
+      // Agregar la talla al color
+      colorExistente.tallas.push(nuevaTalla);
+  
+      // Guardar el producto actualizado
+      await producto.save();
+  
+      // Devolver el producto actualizado
+      res.status(200).json(producto);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Error al agregar la talla", error });
+    }
+  };
 
 // Eliminar producto
 const eliminarProducto = async (req, res) => {
@@ -306,10 +344,10 @@ const eliminarProducto = async (req, res) => {
 module.exports = {
     listarProductos,
     crearProducto,
-    editarProducto,
+    actualizarProductos,
     eliminarProducto,
     agregarVariantes,
-    editarColor,
-    editarTalla,
-    editarVariante
+    agregarColor,
+    agregarTalla,
+    agregarVariante
 };
