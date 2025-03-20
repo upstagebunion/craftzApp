@@ -42,7 +42,7 @@ const crearProducto = async (req, res) => {
         });
         await nuevoProducto.save();
 
-        res.status(200).json({ message: "Producto creado exitosamente", producto: nuevoProducto });
+        res.status(201).json({ message: "Producto creado exitosamente", producto: nuevoProducto });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Error al crear el producto", error });
@@ -335,9 +335,93 @@ const eliminarProducto = async (req, res) => {
             return res.status(404).json({ message: "Producto no encontrado" });
         }
 
-        res.status(200).json({ message: "Producto eliminado", producto: productoEliminado });
+        res.status(200).json({ message: "Producto eliminado" });
     } catch (error) {
         res.status(500).json({ message: "Error al eliminar el producto", error });
+    }
+};
+
+const eliminarVariante = async (req, res) => {
+    try {
+      const { id, variante } = req.params;
+      const producto = await Producto.findById(id);
+      producto.variantes.pull(variante);
+      await producto.save();
+      res.status(200).json(producto);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Error al eliminar la variante", error });
+    }
+};
+
+const eliminarColor = async (req, res) => {
+    try {
+      const { id, variante, color } = req.params; // ID del producto, variante y color
+  
+      // Buscar el producto en la base de datos
+      const producto = await Producto.findById(id);
+  
+      if (!producto) {
+        return res.status(404).json({ message: "Producto no encontrado" });
+      }
+  
+      // Buscar la variante en el producto
+      const varianteExistente = producto.variantes.id(variante);
+  
+      if (!varianteExistente) {
+        return res.status(404).json({ message: "Variante no encontrada" });
+      }
+  
+      // Eliminar el color de la variante
+      varianteExistente.colores.pull(color);
+  
+      // Guardar el producto actualizado
+      await producto.save();
+  
+      // Devolver el producto actualizado
+      res.status(200).json(producto);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Error al eliminar el color", error });
+    }
+};
+
+const eliminarTalla = async (req, res) => {
+    try {
+      const { id, variante, color, talla } = req.params; // ID del producto, variante, color y talla
+  
+      // Buscar el producto en la base de datos
+      const producto = await Producto.findById(id);
+  
+      if (!producto) {
+        return res.status(404).json({ message: "Producto no encontrado" });
+      }
+  
+      // Buscar la variante en el producto
+      const varianteExistente = producto.variantes.id(variante);
+  
+      if (!varianteExistente) {
+        return res.status(404).json({ message: "Variante no encontrada" });
+      }
+  
+      // Buscar el color en la variante
+      const colorExistente = varianteExistente.colores.id(color);
+  
+      if (!colorExistente) {
+        return res.status(404).json({ message: "Color no encontrado" });
+      }
+  
+      // Eliminar la talla del color
+      colorExistente.tallas.pull(talla);
+  
+      // Guardar el producto actualizado
+      await producto.save();
+  
+      // Devolver el producto actualizado
+      res.status(200).json(producto);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: "Error al eliminar la talla", error });
     }
 };
 
@@ -349,5 +433,8 @@ module.exports = {
     agregarVariantes,
     agregarColor,
     agregarTalla,
-    agregarVariante
+    agregarVariante,
+    eliminarVariante,
+    eliminarColor,
+    eliminarTalla
 };

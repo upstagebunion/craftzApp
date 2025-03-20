@@ -21,7 +21,7 @@ const agregarCategoria = async (req, res) => {
 const crearSubcategoria = async (req, res) => {
     try{
         const categoriaId = req.params.id;
-        const { nombre } = req.body;
+        const { nombre, usaTallas } = req.body;
 
         const categoria = await Categoria.findById(categoriaId);
         if (!categoria){
@@ -33,7 +33,7 @@ const crearSubcategoria = async (req, res) => {
             return res.status(400).json({ message: "Subcategoria ya existe xd", error });
         }
 
-        const nuevaSubcategoria = new Subcategoria({ nombre, categoria: categoriaId });
+        const nuevaSubcategoria = new Subcategoria({ nombre, categoria: categoriaId, usaTallas: usaTallas ?? false });
         await nuevaSubcategoria.save();
 
         categoria.subcategorias.push(nuevaSubcategoria._id);
@@ -48,7 +48,7 @@ const crearSubcategoria = async (req, res) => {
 const obtenerCategorias = async (req, res) => {
     try {
         const categorias = await Categoria.find().populate('subcategorias');
-        res.status(200).json({ categorias });
+        res.status(200).json({ message: 'Categorias obtenidas con exito', categorias });
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener las categorías', error });
     }
