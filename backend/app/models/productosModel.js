@@ -3,14 +3,14 @@ const mongoose = require('mongoose');
 const tallaSchema = new mongoose.Schema({
     talla: { type: String, required: false }, // Ej: "CH", "M", "G"
     stock: { type: Number, required: true, min: 0 },
-    precio: { type: Number, required: true, min: 0 }
+    costo: { type: Number, required: true, min: 0 }
   });
   
   const colorSchema = new mongoose.Schema({
     color: { type: String, required: true }, // Ej: "Negro", "Blanco"
     tallas: [tallaSchema], // Opcional, solo para ropa
     stock: { type: Number, required: false }, // Stock total para este color si no hay tallas
-    precio: { type: Number, required: false } // Precio por color si no hay tallas
+    costo: { type: Number, required: false } // Precio por color si no hay tallas
   });
   
   const varianteSchema = new mongoose.Schema({

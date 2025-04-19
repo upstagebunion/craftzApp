@@ -5,6 +5,10 @@ const productosRouter = require('./app/routes/productosRoutes');
 const authRouter = require('./app/routes/authRoutes');
 const ventasRoutes = require("./app/routes/ventasRoutes");
 const categoriasRoutes = require("./app/routes/categoriasRoutes");
+const clientesRoutes = require("./app/routes/clientesRoutes");
+const cotizacionesRoutes = require("./app/routes/cotizacionesRoutes");
+const extrasRoutes = require("./app/routes/extrasRoutes");
+const parametrosCostosRoutes = require("./app/routes/parametrosCostosRoutes");
 const config = require('./config');
 
 const app = express();
@@ -26,6 +30,10 @@ app.use('/api/productos', productosRouter);
 app.use('/auth', authRouter);
 app.use("/api/ventas", ventasRoutes)
 app.use("/api/categorias", categoriasRoutes);
+app.use("/api/clientes", clientesRoutes);
+app.use("/api/cotizaciones", cotizacionesRoutes);
+app.use("/api/extras", extrasRoutes);
+app.use("/api/parametrosCostos", parametrosCostosRoutes);
 
 // Conexión a MongoDB
 mongoose.connect(config.mongoURI).then(() => console.log('MongoDB conectado'))
