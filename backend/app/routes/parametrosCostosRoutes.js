@@ -10,8 +10,8 @@ const {
     obtenerCostosPorSubcategoria,
 } = require('../controllers/parametrosCostosController');
 
-router.post('/', authMiddleware, crearCostoElaboracion);
 router.get('/', authMiddleware, obtenerCostosElaboracion);
+router.post('/', authMiddleware, crearCostoElaboracion);
 router.get('/:id', authMiddleware, obtenerCostoElaboracion);
 router.patch('/:id', authMiddleware, actualizarCostoElaboracion);
 router.delete('/:id', authMiddleware, eliminarCostoElaboracion);

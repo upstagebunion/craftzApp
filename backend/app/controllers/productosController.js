@@ -76,30 +76,30 @@ const agregarVariantes = async (req, res) => {
 
             // Iteramos sobre los colores dentro de cada variante
             for (let j = 0; j < colores.length; j++) {
-                const { color, tallas } = colores[j];
+                const { color, tallas, costoColor } = colores[j];
                 console.log(colores[j].color);
 
                 // Buscar o crear el color dentro de la variante
                 let colorObj = variante.colores.find(c => c.color === color);
                 if (!colorObj) {
-                    colorObj = { color, tallas: [] };
+                    colorObj = { color, tallas: [], costo: costoColor != undefined ? costoColor : null };
                     variante.colores.push(colorObj);
                 }
 
                 // Iteramos sobre las tallas dentro de cada color
                 for (let k = 0; k < tallas.length; k++) {
-                    const { talla, stock, precio } = tallas[k];
+                    const { talla, stock, costo } = tallas[k];
                     console.log(tallas[k]);
 
                     // Buscar o crear la talla dentro del color
                     let tallaObj = colorObj.tallas.find(t => t.talla === talla);
                     if (!tallaObj) {
-                        tallaObj = { talla, stock, precio };
+                        tallaObj = { talla, stock, costo };
                         colorObj.tallas.push(tallaObj);
                     } else {
-                        // Actualizar stock y precio si ya existe
+                        // Actualizar stock y costo si ya existe
                         tallaObj.stock = stock;
-                        tallaObj.precio = precio;
+                        tallaObj.costo = costo;
                     }
                 }
             }
@@ -239,7 +239,7 @@ const agregarVariante = async (req, res) => {
   const agregarColor = async (req, res) => {
     try {
       const { id, variante } = req.params; // ID del producto y ID de la variante
-      const { color, stock, precio } = req.body; // Datos del nuevo color
+      const { color, stock, costo } = req.body; // Datos del nuevo color
   
       // Buscar el producto en la base de datos
       const producto = await Producto.findById(id);
@@ -259,7 +259,7 @@ const agregarVariante = async (req, res) => {
       const nuevoColor = {
         color,
         stock,
-        precio,
+        costo,
         tallas: [],
       };
   
@@ -280,7 +280,7 @@ const agregarVariante = async (req, res) => {
   const agregarTalla = async (req, res) => {
     try {
       const { id, variante, color } = req.params; // ID del producto, variante y color
-      const { talla, stock, precio } = req.body; // Datos de la nueva talla
+      const { talla, stock, costo } = req.body; // Datos de la nueva talla
   
       // Buscar el producto en la base de datos
       const producto = await Producto.findById(id);
@@ -307,7 +307,7 @@ const agregarVariante = async (req, res) => {
       const nuevaTalla = {
         talla,
         stock,
-        precio,
+        costo,
       };
   
       // Agregar la talla al color

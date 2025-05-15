@@ -1,23 +1,41 @@
 // controllers/costoElaboracionController.js
 const CostoElaboracion = require('../models/parametrosCostosModel');
-const Subcategoria = require('../models/categoriasModel');
+const {Subcategoria} = require('../models/categoriasModel');
 
 exports.crearCostoElaboracion = async (req, res) => {
   try {
-    const { nombre, descripcion, unidad, costo, anchoPlancha, largoPlancha, subcategoriasAplica } = req.body;
+    const { 
+      nombre, 
+      descripcion, 
+      unidad, 
+      monto, 
+      anchoPlancha, 
+      largoPlancha, 
+      tipoAplicacion, 
+      prioridad, 
+      subcategoriasAplica 
+    } = req.body;
 
     // Validaciones básicas
-    if (!nombre || !unidad || costo === undefined || !subcategoriasAplica) {
+    if (!nombre || !unidad || monto === undefined || !tipoAplicacion || !subcategoriasAplica) {
       return res.status(400).json({ 
         success: false,
-        message: "Nombre, unidad, costo y subcategorías son campos obligatorios" 
+        message: "Nombre, unidad, monto, tipoAplicacion y subcategorías son campos obligatorios" 
       });
     }
 
-    if (isNaN(costo) || costo < 0) {
+    if (isNaN(monto) || monto < 0) {
       return res.status(400).json({
         success: false,
-        message: "El costo debe ser un número positivo"
+        message: "El monto debe ser un número positivo"
+      });
+    }
+
+    // Validar tipo de aplicación y prioridad
+    if (tipoAplicacion === 'fijo' && (prioridad === undefined || prioridad < 0)) {
+      return res.status(400).json({
+        success: false,
+        message: "Los costos fijos deben tener una prioridad válida"
       });
     }
 
@@ -46,9 +64,11 @@ exports.crearCostoElaboracion = async (req, res) => {
       nombre,
       descripcion,
       unidad,
-      costo,
+      monto,
       anchoPlancha: unidad === 'cm_cuadrado' ? anchoPlancha : undefined,
       largoPlancha: unidad === 'cm_cuadrado' ? largoPlancha : undefined,
+      tipoAplicacion,
+      prioridad: tipoAplicacion === 'fijo' ? (prioridad || 0) : undefined,
       subcategoriasAplica,
     });
 
@@ -73,12 +93,16 @@ exports.obtenerCostosElaboracion = async (req, res) => {
   try {
     const costos = await CostoElaboracion.find()
       .populate('subcategoriasAplica', 'nombre descripcion')
-      .sort({ nombre: 1 });
+      .sort({ 
+        tipoAplicacion: 1, 
+        prioridad: 1,
+        nombre: 1 
+      });
 
     res.json({
       success: true,
       count: costos.length,
-      data: costos
+      costos // Cambiado de 'data' a 'costos' para coincidir con Flutter
     });
   } catch (error) {
     console.error("Error al obtener costos de elaboración:", error);
@@ -190,7 +214,7 @@ exports.eliminarCostoElaboracion = async (req, res) => {
       });
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: costoEliminado,
       message: "Costo de elaboración eliminado exitosamente"
