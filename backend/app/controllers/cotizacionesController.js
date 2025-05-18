@@ -1,262 +1,250 @@
 // controllers/cotizacionController.js
+const mongoose = require("mongoose");
 const Cotizacion = require('../models/cotizacionModel');
 const Venta = require('../models/ventasModel');
+const Cliente = require('../models/clienteModel');
 const Producto = require('../models/productosModel');
 const Extra = require('../models/extrasModel');
 
+const validarReferencias = async (cotizacionData) => {
+  // Validar cliente
+  if (!mongoose.Types.ObjectId.isValid(cotizacionData.cliente)) {
+    throw new Error('ID de cliente no válido');
+  }
+  const clienteExiste = await Cliente.exists({ _id: cotizacionData.cliente });
+  if (!clienteExiste) {
+    throw new Error('Cliente no encontrado');
+  }
+
+  // Validar productos y referencias
+  for (const producto of cotizacionData.productos) {
+    if (!producto.esTemporal && !mongoose.Types.ObjectId.isValid(producto.productoRef)) {
+      throw new Error(`ID de producto no válido: ${producto.productoRef}`);
+    }
+    const productoExiste = await Producto.exists({ _id: producto.productoRef });
+    if (!producto.esTemporal && !productoExiste) {
+      throw new Error('Producto no encontrado');
+    }
+
+    // Validar extras del producto
+    for (const extra of producto.extras) {
+      if (!extra.esTemporal && !mongoose.Types.ObjectId.isValid(extra.extraRef)) {
+        throw new Error(`ID de extra no válido: ${extra.extraRef}`);
+      }
+      const extraExistente = await Extra.exists({ _id: extra.extraRef });
+      if (!extra.esTemporal && !extraExistente) {
+        throw new Error('Extra no encontrado');
+      }
+    }
+  }
+
+  return true;
+};
+
 exports.crearCotizacion = async (req, res) => {
   try {
-    const { cliente, productos, descuentoGlobal, total, subTotal} = req.body;
+    const cotizacionData = req.body;
 
     // Validaciones básicas
-    if (!cliente || !productos || productos.length === 0 || !total || !subTotal) {
+    if (!cotizacionData.cliente || !cotizacionData.productos || cotizacionData.productos.length === 0) {
       return res.status(400).json({ 
         success: false,
-        message: "Cliente, productos, total y subtotal son requeridos" 
+        message: "Cliente y productos son requeridos" 
       });
     }
 
-    // Procesar cada producto
-    const productosProcesados = await Promise.all(productos.map(async item => {
-      const producto = await Producto.findById(item.productoRef);
-      if (!producto) {
-        throw new Error(`Producto con ID ${item.productoRef} no encontrado`);
-      }
+    // Validar referencias (solo existencia, sin cargar datos)
+    await validarReferencias(cotizacionData);
 
-      const variante = producto.variantes.find(v => v._id.equals(item.variante));
-      if (!variante) {
-        throw new Error(`Variante con ID ${item.variante} no encontrada en el producto`);
-      }
-      
-      console.log('Variante encontrada:', variante.tipo); // Debug
-      
-      // Buscar el color específico
-      const color = variante.colores.find(c => c._id.equals(item.color.id));
-      if (!color) {
-        throw new Error(`Color con ID ${item.color.id} no encontrado en la variante`);
-      }
-      
-      console.log('Color encontrado:', color.color); // Debug
-      
-      // Buscar talla si existe
-      let talla = null;
-      if (item.talla?.id) {
-        talla = color.tallas.find(t => t._id.equals(item.talla.id));
-        if (!talla) {
-          throw new Error(`Talla con ID ${item.talla.id} no encontrada en el color`);
-        }
-        console.log('Talla encontrada:', talla.talla); // Debug
-      }
-
-      let extrasInfo = [];
-      if (item.extras && item.extras.length > 0) {
-        extrasInfo = await Promise.all(item.extras.map(async extraId => {
-          const extra = await Extra.findById(extraId);
-          if (!extra) {
-            throw new Error(`Extra con ID ${extraId} no encontrado`);
-          }
-          return {
-            id: extra._id,
-            nombre: extra.nombre,
-            unidad: extra.unidad,
-            monto: extra.monto
-          };
-        }));
-      }
-
-      return {
-        productoRef: item.productoRef,
-        producto: {
-          nombre: producto.nombre,
-          descripcion: producto.descripcion
-        },
-        variante: {
-          id: variante._id,
-          tipo: variante.tipo
-        },
-        color: {
-          id: color._id,
-          nombre: color.color
-        },
-        talla: talla ? {
-          id: talla._id,
-          nombre: talla.talla
-        } : null,
-        extras: extrasInfo,
-        cantidad: item.cantidad || 1,
-        precio: item.precio,
-        precioFinal: item.precioFinal,
-        ventaEnLinea: item.ventaEnLinea || false,
-        descuento: item.descuento
-      };
-    }));
-
+    // Crear la cotización con todos los datos recibidos
     const nuevaCotizacion = new Cotizacion({
-      cliente,
-      subTotal,
-      total,
-      productos: productosProcesados,
-      descuentoGlobal,
-      expira: new Date(Date.now() + 15*24*60*60*1000) // 15 días
+      ...cotizacionData,
+      // Asegurar fechas si no vienen
+      fechaCreacion: cotizacionData.fechaCreacion || new Date(),
+      expira: cotizacionData.expira || new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+      // Asegurar que no está convertida
+      convertidaAVenta: null,
+      activa: true
     });
 
     await nuevaCotizacion.save();
 
+    const nuevaCotizacionConCliente = await Cotizacion.findById(nuevaCotizacion._id)
+      .populate('cliente', 'nombre apellido_paterno telefono');
+
     res.status(201).json({
       success: true,
-      data: nuevaCotizacion,
-      message: "Cotización creada exitosamente"
+      message: "Cotización creada exitosamente",
+      cotizacion: nuevaCotizacionConCliente
     });
 
   } catch (error) {
     console.error("Error al crear cotización:", error);
     res.status(500).json({ 
       success: false,
-      message: "Error al crear la cotización",
+      message: "Error al crear cotización",
       error: error.message 
     });
   }
 };
 
-exports.convertirCotizacionAVenta = async (req, res) => {
+exports.actualizarCotizacion = async (req, res) => {
   try {
-    const { cotizacionId } = req.params;
+    const { id } = req.params;
+    const cotizacionData = req.body;
 
-    // 1. Validar la cotización
-    const cotizacion = await Cotizacion.findById(cotizacionId);
+    // Validar ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de cotización no válido' });
+    }
+
+    // Verificar que existe y no está convertida
+    const cotizacionExistente = await Cotizacion.findById(id);
+    if (!cotizacionExistente) {
+      return res.status(404).json({ message: 'Cotización no encontrada' });
+    }
+    if (cotizacionExistente.convertidaAVenta) {
+      return res.status(400).json({ message: 'No se puede modificar una cotización convertida a venta' });
+    }
+
+    // Validar referencias (solo existencia)
+    await validarReferencias(cotizacionData);
+
+    // Actualizar
+    const cotizacionActualizada = await Cotizacion.findByIdAndUpdate(
+      id,
+      { ...cotizacionData },
+      { new: true, runValidators: true }
+    );
+
+    const cotizacionActualizadaConCliente = await Cotizacion.findById(cotizacionActualizada._id)
+      .populate('cliente', 'nombre apellido_paterno telefono');
+
+    res.status(200).json({
+      success: true,
+      message: "Cotización actualizada exitosamente",
+      cotizacion: cotizacionActualizadaConCliente
+    });
+
+  } catch (error) {
+    console.error("Error al actualizar cotización:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Error al actualizar cotización",
+      error: error.message 
+    });
+  }
+};
+
+exports.convertirAVenta = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validar ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de cotización no válido' });
+    }
+
+    const cotizacion = await Cotizacion.findById(id);
     if (!cotizacion) {
-      return res.status(404).json({ success: false, message: "Cotización no encontrada" });
+      return res.status(404).json({ message: 'Cotización no encontrada' });
     }
 
-    if (cotizacion.convertidaAVenta) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Esta cotización ya fue convertida a venta",
-        ventaId: cotizacion.convertidaAVenta
-      });
-    }
-
-    if (new Date(cotizacion.expira) < new Date()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "La cotización ha expirado y no puede convertirse en venta" 
-      });
-    }
-
-    // 2. Crear la venta a partir de la cotización
+    // Crear venta con todos los datos de la cotización
     const ventaData = {
       cliente: cotizacion.cliente,
+      productos: cotizacion.productos,
       subTotal: cotizacion.subTotal,
       total: cotizacion.total,
-      productos: cotizacion.productos.map(p => ({
-        productoRef: p.productoRef,
-        producto: p.producto,
-        variante: p.variante,
-        color: p.color,
-        talla: p.talla,
-        extras: p.extras,
-        cantidad: p.cantidad,
-        descuento: p.descuento,
-        precio: p.precio,
-        precioFinal: p.precioFinal
-      })),
-      restante: cotizacion.total,
-      ventaEnLinea: cotizacion.ventaEnLinea,
       descuentoGlobal: cotizacion.descuentoGlobal,
-      origenCotizacion: cotizacion._id
+      ventaEnLinea: cotizacion.ventaEnLinea,
     };
 
-    const nuevaVenta = new Venta(ventaData);
-    await nuevaVenta.save();
+    const venta = new Venta(ventaData);
+    await venta.save();
 
-    // 3. Marcar la cotización como convertida
-    cotizacion.convertidaAVenta = nuevaVenta._id;
-    await cotizacion.save();
+    await Cotizacion.findByIdAndDelete(id);
 
     res.status(201).json({
       success: true,
-      message: "Cotización convertida a venta exitosamente",
-      venta: nuevaVenta,
-      cotizacionId: cotizacion._id
+      message: "Venta creada exitosamente y cotización eliminada",
+      venta: venta
     });
 
   } catch (error) {
-    console.error("Error al convertir cotización a venta:", error);
-    res.status(500).json({
+    console.error("Error al convertir cotización:", error);
+    res.status(500).json({ 
       success: false,
-      message: "Error al convertir la cotización",
-      error: error.message
+      message: "Error al convertir cotización",
+      error: error.message 
     });
   }
 };
 
-exports.obtenerCotizacionesActivas = async (req, res) => {
-  try {
-    const hoy = new Date();
-    
-    const cotizaciones = await Cotizacion.find({
-      convertidaAVenta: null, // No convertidas a venta
-      expira: { $gt: hoy } // No expiradas
-    })
-    .populate('cliente', 'nombre correo telefono')
-    .sort({ fechaCreacion: -1 }); // Más recientes primero
-
-    res.json({
-      success: true,
-      count: cotizaciones.length,
-      data: cotizaciones,
-      message: cotizaciones.length > 0 
-        ? "Cotizaciones activas encontradas" 
-        : "No hay cotizaciones activas"
-    });
-  } catch (error) {
-    console.error("Error al obtener cotizaciones activas:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error al obtener las cotizaciones",
-      error: error.message
-    });
-  }
-};
-
-exports.obtenerCotizacionPorId = async (req, res) => {
+exports.obtenerCotizacion = async (req, res) => {
   try {
     const cotizacion = await Cotizacion.findById(req.params.id)
-      .populate('cliente', 'nombre correo telefono direccion')
+      .populate('cliente', 'nombre apellido_paterno telefono')
       .populate('convertidaAVenta', 'total estado');
 
     if (!cotizacion) {
-      return res.status(404).json({
-        success: false,
-        message: "Cotización no encontrada"
-      });
+      return res.status(404).json({ message: 'Cotización no encontrada' });
     }
-
-    // Calcular días restantes si no está expirada
-    const hoy = new Date();
-    const expirada = cotizacion.expira < hoy;
-    const diasRestantes = expirada 
-      ? 0 
-      : Math.ceil((cotizacion.expira - hoy) / (1000 * 60 * 60 * 24));
 
     res.json({
       success: true,
-      data: {
-        ...cotizacion.toObject(),
-        expirada,
-        diasRestantes,
-        puedeConvertir: !expirada && !cotizacion.convertidaAVenta
-      }
+      cotizacion: cotizacion
     });
+
   } catch (error) {
     console.error("Error al obtener cotización:", error);
-    res.status(500).json({
+    res.status(500).json({ 
       success: false,
-      message: "Error al obtener la cotización",
-      error: error.message
+      message: "Error al obtener cotización",
+      error: error.message 
     });
   }
 };
+
+exports.listarCotizaciones = async (req, res) => {
+  try {
+    const { cliente, estado } = req.query;
+    const filtro = { activa: true };
+
+    if (cliente) {
+      filtro.cliente = cliente;
+    }
+
+    if (estado === 'activas') {
+      filtro.expira = { $gte: new Date() };
+      filtro.convertidaAVenta = null;
+    } else if (estado === 'convertidas') {
+      filtro.convertidaAVenta = { $ne: null };
+    } else if (estado === 'expiradas') {
+      filtro.expira = { $lt: new Date() };
+      filtro.convertidaAVenta = null;
+    }
+
+    const cotizaciones = await Cotizacion.find(filtro)
+      .populate('cliente', 'nombre apellido_paterno')
+      .sort({ fechaCreacion: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: cotizaciones.length,
+      cotizaciones: cotizaciones
+    });
+
+  } catch (error) {
+    console.error("Error al listar cotizaciones:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Error al listar cotizaciones",
+      error: error.message 
+    });
+  }
+};
+
 
 exports.obtenerCotizacionesFiltradas = async (req, res) => {
   try {
@@ -309,5 +297,20 @@ exports.obtenerCotizacionesFiltradas = async (req, res) => {
       message: "Error al obtener cotizaciones",
       error: error.message
     });
+  }
+};
+
+exports.eliminarCotizacion = async (req, res) => {
+  try {
+    const cotizacionEliminada = await Cotizacion.findByIdAndDelete(req.params.id);
+    
+    if (!cotizacionEliminada) {
+      return res.status(404).json({ message: "Cotizacion no encontrada" });
+    }
+    
+    res.status(200).json({ message: "Cotizacion eliminado correctamente", cotizacion: cotizacionEliminada });
+  } catch (error) {
+    console.error("Error al eliminar la cotizacion:", error);
+    res.status(500).json({ message: "Error interno del servidor", error: error.message });
   }
 };
