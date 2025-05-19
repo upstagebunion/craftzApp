@@ -18,22 +18,26 @@ const validarReferencias = async (cotizacionData) => {
 
   // Validar productos y referencias
   for (const producto of cotizacionData.productos) {
-    if (!producto.esTemporal && !mongoose.Types.ObjectId.isValid(producto.productoRef)) {
-      throw new Error(`ID de producto no válido: ${producto.productoRef}`);
-    }
-    const productoExiste = await Producto.exists({ _id: producto.productoRef });
-    if (!producto.esTemporal && !productoExiste) {
-      throw new Error('Producto no encontrado');
+    if (!producto.esTemporal){
+      if (!mongoose.Types.ObjectId.isValid(producto.productoRef)) {
+        throw new Error(`ID de producto no válido: ${producto.productoRef}`);
+      }
+      const productoExiste = await Producto.exists({ _id: producto.productoRef });
+      if (!productoExiste) {
+        throw new Error('Producto no encontrado');
+      }
     }
 
     // Validar extras del producto
     for (const extra of producto.extras) {
-      if (!extra.esTemporal && !mongoose.Types.ObjectId.isValid(extra.extraRef)) {
-        throw new Error(`ID de extra no válido: ${extra.extraRef}`);
-      }
-      const extraExistente = await Extra.exists({ _id: extra.extraRef });
-      if (!extra.esTemporal && !extraExistente) {
-        throw new Error('Extra no encontrado');
+      if (!extra.esTemporal){
+        if (!mongoose.Types.ObjectId.isValid(extra.extraRef)) {
+          throw new Error(`ID de extra no válido: ${extra.extraRef}`);
+        }
+        const extraExistente = await Extra.exists({ _id: extra.extraRef });
+        if (!extraExistente) {
+          throw new Error('Extra no encontrado');
+        }
       }
     }
   }
@@ -156,9 +160,20 @@ exports.convertirAVenta = async (req, res) => {
       productos: cotizacion.productos,
       subTotal: cotizacion.subTotal,
       total: cotizacion.total,
-      descuentoGlobal: cotizacion.descuentoGlobal,
       ventaEnLinea: cotizacion.ventaEnLinea,
+      restante: cotizacion.total,
+      estado: 'pendiente'
     };
+
+    if (cotizacion.descuentoGlobal && 
+        cotizacion.descuentoGlobal.tipo && 
+        cotizacion.descuentoGlobal.valor) {
+      ventaData.descuentoGlobal = {
+        razon: cotizacion.descuentoGlobal.razon || undefined,
+        tipo: cotizacion.descuentoGlobal.tipo,
+        valor: cotizacion.descuentoGlobal.valor
+      };
+    }
 
     const venta = new Venta(ventaData);
     await venta.save();

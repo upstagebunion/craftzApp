@@ -1,6 +1,8 @@
+const mongoose = require("mongoose");
 const Venta = require("../models/ventasModel");
 const Producto = require("../models/productosModel");
 const Extra = require("../models/extrasModel");
+const Cotizacion = require("../models/cotizacionModel");
 
 exports.crearVenta = async (req, res) => {
   try {
@@ -150,9 +152,8 @@ exports.obtenerVentas = async (req, res) => {
   try {
     const ventas = await Venta.find()
       .populate('cliente')
-      .populate('productos.productoRef', 'nombre'); // Solo para referencia
     
-    res.json(ventas);
+    res.status(200).json(ventas);
   } catch (error) {
     console.error(error);
     res.status(500).json({ msg: 'Error al obtener las ventas', error: error.message });
@@ -164,119 +165,287 @@ exports.obtenerVenta = async (req, res) => {
   try {
     const venta = await Venta.findById(id)
       .populate('cliente')
-      .populate('productos.productoRef', 'nombre');
       
     if (!venta) {
       return res.status(404).json({ msg: 'Venta no encontrada' });
     }
-    res.json(venta);
+    res.status(200).json(venta);
   } catch (error) {
     console.error(error);
     res.status(500).json({ msg: 'Error al obtener la venta', error: error.message });
   }
 };
 
-exports.registrarPago = async (req, res) => {
+exports.agregarPago = async (req, res) => {
   try {
-    const { idVenta } = req.params;
+    const { id } = req.params;
     const { razon, monto, metodo } = req.body;
 
-    // Validaciones básicas
-    if (!monto || monto <= 0 || !metodo) {
-      return res.status(400).json({ 
-        success: false,
-        message: "Monto y método de pago son requeridos" 
-      });
+    // Validar ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de venta no válido' });
     }
 
-    // Obtener la venta
-    const venta = await Venta.findById(idVenta);
+    // Validar datos del pago
+    if (!razon || !monto || !metodo) {
+      return res.status(400).json({ message: 'Faltan campos requeridos: razon, monto, metodo' });
+    }
+
+    if (monto <= 0) {
+      return res.status(400).json({ message: 'El monto debe ser mayor a cero' });
+    }
+
+    const venta = await Venta.findById(id);
     if (!venta) {
-      return res.status(404).json({ 
-        success: false,
-        message: "Venta no encontrada" 
-      });
+      return res.status(404).json({ message: 'Venta no encontrada' });
     }
 
-    // Verificar estado de la venta
-    if (venta.estado === 'liquidado' || venta.estado === 'entregado') {
+    // No permitir pagos si ya está liquidada
+    if (venta.estado === 'liquidado') {
       return res.status(400).json({ 
-        success: false,
-        message: "No se pueden registrar pagos en ventas ya liquidadas" 
+        message: 'No se pueden agregar pagos a una venta liquidada'
       });
     }
 
-    // Calcular saldo pendiente antes del pago
-    const saldoAnterior = venta.restante;
-    
-    // Validar que el pago no exceda el saldo
-    if (monto > saldoAnterior) {
+    // Calcular nuevo restante
+    const nuevoRestante = venta.restante - monto;
+
+    // Validar que el pago no exceda el restante
+    if (nuevoRestante < 0) {
       return res.status(400).json({ 
-        success: false,
-        message: `El monto excede el saldo pendiente de $${saldoAnterior}`,
-        saldoPendiente: saldoAnterior
+        message: 'El pago excede el restante de la venta',
+        restanteActual: venta.restante,
+        montoIntento: monto
       });
     }
 
-    // Registrar el nuevo pago
+    // Crear nuevo pago
     const nuevoPago = {
-      razon: razon || `Abono ${venta.pagos.length + 1}`,
+      razon,
       monto,
       metodo
     };
 
+    // Agregar pago y actualizar restante
     venta.pagos.push(nuevoPago);
-    venta.restante = saldoAnterior - monto;
+    venta.restante = nuevoRestante;
 
-    // Verificar si la venta queda liquidada
-    let liquidada = false;
-    if (venta.restante <= 0) {
-      // Liquidar la venta (actualizar inventario)
-      for (const item of venta.productos) {
-        const producto = await Producto.findById(item.productoRef);
-        
-        const variante = producto.variantes.id(item.variante.id);
-        const color = variante.colores.id(item.color.id);
-        
-        if (item.talla?.id) {
-          const talla = color.tallas.id(item.talla.id);
-          talla.stock -= item.cantidad; // Restar la cantidad comprada
-        } else {
-          color.stock -= item.cantidad; // Restar la cantidad comprada
-        }
-        
-        await producto.save();
-      }
-
+    // Verificar si se liquidó completamente
+    if (nuevoRestante === 0) {
       venta.estado = 'liquidado';
       venta.fechaLiquidacion = new Date();
-      liquidada = true;
     }
 
     await venta.save();
 
-    res.json({
+    const ventaActualizada = await Venta.findById(id)
+      .populate('cliente')
+
+    res.status(200).json({
       success: true,
-      message: liquidada 
-        ? "Pago registrado y venta liquidada" 
-        : "Pago registrado exitosamente",
-      liquidada,
-      venta: {
-        _id: venta._id,
-        total: venta.total,
-        pagado: venta.total - venta.restante,
-        restante: venta.restante,
-        estado: venta.estado,
-        pagos: venta.pagos
-      }
+      message: "Pago agregado correctamente",
+      venta: ventaActualizada,
+      liquidada: nuevoRestante === 0
     });
 
   } catch (error) {
-    console.error("Error al registrar pago:", error);
-    res.status(500).json({
+    console.error("Error al agregar pago:", error);
+    res.status(500).json({ 
       success: false,
-      message: "Error al registrar el pago",
-      error: error.message
+      message: "Error al agregar pago",
+      error: error.message 
+    });
+  }
+};
+
+exports.actualizarEstadoVenta = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    // Validar ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de venta no válido' });
+    }
+
+    // Validar estado
+    const estadosPermitidos = ['pendiente', 'confirmado', 'preparado', 'entregado', 'devuelto'];
+    if (!estadosPermitidos.includes(estado)) {
+      return res.status(400).json({ 
+        message: 'Estado no válido',
+        estadosPermitidos: estadosPermitidos
+      });
+    }
+
+    const venta = await Venta.findById(id);
+    if (!venta) {
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+
+    // No permitir cambiar estado si ya está liquidada
+    if (venta.estado === 'liquidado') {
+      return res.status(400).json({ 
+        message: 'No se puede modificar el estado de una venta liquidada'
+      });
+    }
+
+    // Actualizar estado
+    venta.estado = estado;
+    await venta.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Estado de venta actualizado",
+      venta: venta
+    });
+
+  } catch (error) {
+    console.error("Error al actualizar estado de venta:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Error al actualizar estado de venta",
+      error: error.message 
+    });
+  }
+};
+
+exports.revertirACotizacion = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validar ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de venta no válido' });
+    }
+
+    const venta = await Venta.findById(id);
+    if (!venta) {
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+
+    // Verificar que la venta no haya avanzado más allá de "pendiente"
+    if (venta.estado !== 'pendiente') {
+      return res.status(400).json({ 
+        message: 'Solo se pueden revertir ventas en estado "pendiente"'
+      });
+    }
+
+    // Crear nueva cotización con los datos de la venta
+    const cotizacionData = {
+      cliente: venta.cliente,
+      productos: venta.productos,
+      subTotal: venta.subTotal,
+      total: venta.total,
+      descuentoGlobal: venta.descuentoGlobal,
+      ventaEnLinea: venta.ventaEnLinea,
+      expira: new Date(Date.now() + 15*24*60*60*1000) // 15 días
+    };
+
+    const cotizacion = new Cotizacion(cotizacionData);
+    await cotizacion.save();
+
+    await Venta.findByIdAndDelete(id);
+
+    res.status(201).json({
+      success: true,
+      message: "Cotización recreada exitosamente y venta eliminada",
+      cotizacion: cotizacion
+    });
+
+  } catch (error) {
+    console.error("Error al revertir venta a cotización:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Error al revertir venta a cotización",
+      error: error.message 
+    });
+  }
+};
+
+exports.liquidarVenta = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validar ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de venta no válido' });
+    }
+
+    const venta = await Venta.findById(id);
+    if (!venta) {
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+
+    // Verificar si ya está liquidada
+    if (venta.estado === 'liquidado') {
+      return res.status(400).json({ 
+        message: 'La venta ya está liquidada',
+        fechaLiquidacion: venta.fechaLiquidacion
+      });
+    }
+
+    // Verificar que el restante sea 0
+    if (venta.restante > 0) {
+      return res.status(400).json({ 
+        message: 'No se puede liquidar una venta con restante pendiente',
+        restanteActual: venta.restante
+      });
+    }
+
+    // Liquidar venta
+    venta.estado = 'liquidado';
+    venta.fechaLiquidacion = new Date();
+    await venta.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Venta liquidada correctamente",
+      venta: venta
+    });
+
+  } catch (error) {
+    console.error("Error al liquidar venta:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Error al liquidar venta",
+      error: error.message 
+    });
+  }
+};
+
+exports.obtenerResumenPagos = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validar ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'ID de venta no válido' });
+    }
+
+    const venta = await Venta.findById(id);
+    if (!venta) {
+      return res.status(404).json({ message: 'Venta no encontrada' });
+    }
+
+    // Calcular total pagado
+    const totalPagado = venta.pagos.reduce((sum, pago) => sum + pago.monto, 0);
+
+    res.status(200).json({
+      success: true,
+      totalVenta: venta.total,
+      totalPagado: totalPagado,
+      restante: venta.restante,
+      liquidada: venta.estado === 'liquidado',
+      pagos: venta.pagos,
+      fechaLiquidacion: venta.fechaLiquidacion
+    });
+
+  } catch (error) {
+    console.error("Error al obtener resumen de pagos:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Error al obtener resumen de pagos",
+      error: error.message 
     });
   }
 };
