@@ -10,6 +10,7 @@ const clientesRoutes = require("./app/routes/clientesRoutes");
 const cotizacionesRoutes = require("./app/routes/cotizacionesRoutes");
 const extrasRoutes = require("./app/routes/extrasRoutes");
 const parametrosCostosRoutes = require("./app/routes/parametrosCostosRoutes");
+const reportesRoutes = require("./app/routes/reportesRoutes");
 const config = require('./config');
 
 const app = express();
@@ -36,6 +37,7 @@ app.use("/api/clientes", clientesRoutes);
 app.use("/api/cotizaciones", cotizacionesRoutes);
 app.use("/api/extras", extrasRoutes);
 app.use("/api/parametrosCostos", parametrosCostosRoutes);
+app.use("/api/reportes", reportesRoutes);
 
 // Conexión a MongoDB
 mongoose.connect(config.mongoURI).then(() => console.log('MongoDB conectado'))
