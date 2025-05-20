@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const ExtraSchema = new mongoose.Schema({
-  nombre: { type: String, required: true },
+  nombre: { type: String, required: true, trim: true},
   unidad: { 
     type: String, 
     enum: ['pieza', 'cm_cuadrado'], 
@@ -13,7 +13,8 @@ const ExtraSchema = new mongoose.Schema({
   parametroCalculoId: { 
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CostoElaboracion',
-    required: false
+    required: false,
+    index: true
   }
 }, { timestamps: true });
 

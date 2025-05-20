@@ -4,7 +4,8 @@ const CotizacionSchema = new mongoose.Schema({
   cliente: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Cliente',
-    required: true
+    required: true,
+    index: true
   },
   subTotal: { type: Number, required: true },
   total: { type: Number, required: true },
@@ -21,24 +22,24 @@ const CotizacionSchema = new mongoose.Schema({
     
     // Datos completos del producto (siempre presentes)
     producto: {
-      nombre: { type: String, required: true },
+      nombre: { type: String, required: true, trim: true},
       descripcion: { type: String, required: true }
     },
     
     // Variante, color, talla (estructura unificada)
     variante: {
       id: { type: mongoose.Schema.Types.ObjectId, required: false },
-      tipo: { type: String },
+      tipo: { type: String, trim: true },
       // Para elementos temporales:
       nombreCompleto: { type: String } // Ej: "Playera blanca manga larga"
     },
     color: {
       id: { type: mongoose.Schema.Types.ObjectId, required: false },
-      nombre: { type: String }
+      nombre: { type: String, trim: true }
     },
     talla: {
       id: { type: mongoose.Schema.Types.ObjectId, required: false },
-      nombre: { type: String }
+      nombre: { type: String, trim: true }
     },
     
     // Extras (unificados para registrados y temporales)
@@ -48,10 +49,11 @@ const CotizacionSchema = new mongoose.Schema({
       extraRef: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Extra',
-        required: function() { return !this.esTemporal; }
+        required: function() { return !this.esTemporal; },
+        index: true
       },
       // Datos completos del extra (siempre presentes)
-      nombre: { type: String, required: true },
+      nombre: { type: String, required: true, trim: true },
       unidad: { 
         type: String, 
         required: true,
@@ -63,7 +65,7 @@ const CotizacionSchema = new mongoose.Schema({
       largoCm: { type: Number },
       // Metadata para cálculo
       parametroCalculo: {
-        nombre: { type: String }, // Guardamos el nombre por si el parámetro se elimina
+        nombre: { type: String, trim: true}, // Guardamos el nombre por si el parámetro se elimina
         valor: { type: Number } // Guardamos el valor histórico
       },
     }],
@@ -85,6 +87,11 @@ const CotizacionSchema = new mongoose.Schema({
   ventaEnLinea: { type: Boolean, default: false },
   fechaCreacion: { type: Date, default: Date.now },
   expira: { type: Date, default: () => Date.now() + 15*24*60*60*1000 }, // 15 días
+  vendedor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Usuario',
+    required: true
+  },
   activa: {type: Boolean, default: true}
 });
 

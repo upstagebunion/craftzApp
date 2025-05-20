@@ -1,6 +1,7 @@
 // controllers/cotizacionController.js
 const mongoose = require("mongoose");
 const Cotizacion = require('../models/cotizacionModel');
+const Usuario = require('../models/usuariosModel');
 const Venta = require('../models/ventasModel');
 const Cliente = require('../models/clienteModel');
 const Producto = require('../models/productosModel');
@@ -48,6 +49,7 @@ const validarReferencias = async (cotizacionData) => {
 exports.crearCotizacion = async (req, res) => {
   try {
     const cotizacionData = req.body;
+    const vendedor = req.userId;
 
     // Validaciones básicas
     if (!cotizacionData.cliente || !cotizacionData.productos || cotizacionData.productos.length === 0) {
@@ -57,6 +59,11 @@ exports.crearCotizacion = async (req, res) => {
       });
     }
 
+    const usuario = await Usuario.exists({ _id: vendedor });
+    if (!usuario) {
+      throw new Error('No se encontro al usuario vendedor.');
+    }
+
     // Validar referencias (solo existencia, sin cargar datos)
     await validarReferencias(cotizacionData);
 
@@ -64,6 +71,7 @@ exports.crearCotizacion = async (req, res) => {
     const nuevaCotizacion = new Cotizacion({
       ...cotizacionData,
       // Asegurar fechas si no vienen
+      vendedor: vendedor,
       fechaCreacion: cotizacionData.fechaCreacion || new Date(),
       expira: cotizacionData.expira || new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
       // Asegurar que no está convertida
@@ -74,7 +82,8 @@ exports.crearCotizacion = async (req, res) => {
     await nuevaCotizacion.save();
 
     const nuevaCotizacionConCliente = await Cotizacion.findById(nuevaCotizacion._id)
-      .populate('cliente', 'nombre apellido_paterno telefono');
+      .populate('cliente', 'nombre apellido_paterno telefono')
+      .populate('vendedor', 'nombre');
 
     res.status(201).json({
       success: true,
@@ -122,7 +131,8 @@ exports.actualizarCotizacion = async (req, res) => {
     );
 
     const cotizacionActualizadaConCliente = await Cotizacion.findById(cotizacionActualizada._id)
-      .populate('cliente', 'nombre apellido_paterno telefono');
+      .populate('cliente', 'nombre apellido_paterno telefono')
+      .populate('vendedor', 'nombre');
 
     res.status(200).json({
       success: true,
@@ -162,6 +172,7 @@ exports.convertirAVenta = async (req, res) => {
       total: cotizacion.total,
       ventaEnLinea: cotizacion.ventaEnLinea,
       restante: cotizacion.total,
+      vendedor: cotizacion.vendedor,
       estado: 'pendiente'
     };
 
@@ -200,6 +211,7 @@ exports.obtenerCotizacion = async (req, res) => {
   try {
     const cotizacion = await Cotizacion.findById(req.params.id)
       .populate('cliente', 'nombre apellido_paterno telefono')
+      .populate('vendedor', 'nombre')
       .populate('convertidaAVenta', 'total estado');
 
     if (!cotizacion) {
@@ -242,6 +254,7 @@ exports.listarCotizaciones = async (req, res) => {
 
     const cotizaciones = await Cotizacion.find(filtro)
       .populate('cliente', 'nombre apellido_paterno')
+      .populate('vendedor', 'nombre')
       .sort({ fechaCreacion: -1 });
 
     res.status(200).json({
@@ -296,6 +309,7 @@ exports.obtenerCotizacionesFiltradas = async (req, res) => {
     
     const cotizaciones = await Cotizacion.find(filtro)
       .populate('cliente', 'nombre')
+      .populate('vendedor', 'nombre')
       .populate('convertidaAVenta', 'estado')
       .sort({ fechaCreacion: -1 });
     

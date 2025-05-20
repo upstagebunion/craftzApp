@@ -4,11 +4,15 @@ const authMiddleware = require('../middleware/auth'); // Middleware de autentica
 const {
     agregarCategoria,
     crearSubcategoria,
-    obtenerCategorias
+    obtenerCategorias,
+    eliminarCategoria,
+    eliminarSubcategoria
 } = require('../controllers/categoriasController');
 
 router.get('/', authMiddleware, obtenerCategorias);
 router.post('/', authMiddleware, agregarCategoria);
 router.post('/:id/subcategorias', authMiddleware, crearSubcategoria);
+router.delete('/:id', authMiddleware, eliminarCategoria);
+router.delete('/subcategorias/:idSubcategoria', authMiddleware, eliminarSubcategoria);
 
 module.exports = router;

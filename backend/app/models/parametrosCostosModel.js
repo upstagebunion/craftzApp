@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const CostoElaboracionSchema = new mongoose.Schema({
-  nombre: { type: String, required: true },
+  nombre: { type: String, required: true, trim: true },
   descripcion: String,
   unidad: { 
     type: String, 
@@ -24,7 +24,8 @@ const CostoElaboracionSchema = new mongoose.Schema({
   },
   subcategoriasAplica: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Subcategoria'
+    ref: 'Subcategoria',
+    index: true
   }]
 }, { timestamps: true });
 

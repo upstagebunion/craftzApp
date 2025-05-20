@@ -140,8 +140,12 @@ exports.liquidarVenta = async (req, res) => {
     venta.estado = 'liquidado';
     venta.fechaLiquidacion = new Date();
     await venta.save();
+
+    const ventaActualizada = await Venta.findById(req.params.id)
+      .populate('cliente')
+      .populate('vendedor', 'nombre');
     
-    res.json({ msg: 'Venta liquidada y stock actualizado', venta });
+    res.json({ msg: 'Venta liquidada y stock actualizado', ventaActualizada });
   } catch (error) {
     console.error(error);
     res.status(500).json({ msg: 'Error al liquidar la venta', error: error.message });
@@ -152,6 +156,7 @@ exports.obtenerVentas = async (req, res) => {
   try {
     const ventas = await Venta.find()
       .populate('cliente')
+      .populate('vendedor', 'nombre');
     
     res.status(200).json(ventas);
   } catch (error) {
@@ -165,6 +170,7 @@ exports.obtenerVenta = async (req, res) => {
   try {
     const venta = await Venta.findById(id)
       .populate('cliente')
+      .populate('vendedor', 'nombre');
       
     if (!venta) {
       return res.status(404).json({ msg: 'Venta no encontrada' });
@@ -240,6 +246,7 @@ exports.agregarPago = async (req, res) => {
 
     const ventaActualizada = await Venta.findById(id)
       .populate('cliente')
+      .populate('vendedor', 'nombre');
 
     res.status(200).json({
       success: true,
@@ -293,10 +300,14 @@ exports.actualizarEstadoVenta = async (req, res) => {
     venta.estado = estado;
     await venta.save();
 
+    const ventaActualizada = await Venta.findById(id)
+      .populate('cliente')
+      .populate('vendedor', 'nombre');
+
     res.status(200).json({
       success: true,
       message: "Estado de venta actualizado",
-      venta: venta
+      venta: ventaActualizada
     });
 
   } catch (error) {
@@ -338,6 +349,7 @@ exports.revertirACotizacion = async (req, res) => {
       total: venta.total,
       descuentoGlobal: venta.descuentoGlobal,
       ventaEnLinea: venta.ventaEnLinea,
+      vendedor: venta.vendedor,
       expira: new Date(Date.now() + 15*24*60*60*1000) // 15 días
     };
 
@@ -397,10 +409,14 @@ exports.liquidarVenta = async (req, res) => {
     venta.fechaLiquidacion = new Date();
     await venta.save();
 
+    const ventaActualizada = await Venta.findById(id)
+      .populate('cliente')
+      .populate('vendedor', 'nombre');
+
     res.status(200).json({
       success: true,
       message: "Venta liquidada correctamente",
-      venta: venta
+      venta: ventaActualizada
     });
 
   } catch (error) {
@@ -432,6 +448,7 @@ exports.obtenerResumenPagos = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      vendedor: venta.vendedor,
       totalVenta: venta.total,
       totalPagado: totalPagado,
       restante: venta.restante,

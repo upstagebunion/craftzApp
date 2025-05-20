@@ -98,6 +98,11 @@ const VentaSchema = new mongoose.Schema({
     required: false,
     default: null
   },
+  vendedor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Usuario',
+    required: true
+  },
   restante: { type: Number, default: 0, min: 0 },
   fechaCreacion: { type: Date, default: Date.now },
   fechaLiquidacion: Date

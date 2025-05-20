@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const productosRouter = require('./app/routes/productosRoutes');
 const authRouter = require('./app/routes/authRoutes');
+const userRoutes = require('./app/routes/userRoutes');
 const ventasRoutes = require("./app/routes/ventasRoutes");
 const categoriasRoutes = require("./app/routes/categoriasRoutes");
 const clientesRoutes = require("./app/routes/clientesRoutes");
@@ -27,6 +28,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use('/api/productos', productosRouter);
+app.use('/users', userRoutes);
 app.use('/auth', authRouter);
 app.use("/api/ventas", ventasRoutes)
 app.use("/api/categorias", categoriasRoutes);
