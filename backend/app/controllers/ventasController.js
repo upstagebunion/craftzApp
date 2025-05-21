@@ -3,6 +3,7 @@ const Venta = require("../models/ventasModel");
 const Producto = require("../models/productosModel");
 const Extra = require("../models/extrasModel");
 const Cotizacion = require("../models/cotizacionModel");
+const MovimientoInventario = require("../models/movimientosInventarioModel");
 
 exports.crearVenta = async (req, res) => {
   try {
@@ -114,26 +115,6 @@ exports.liquidarVenta = async (req, res) => {
     const venta = await Venta.findById(req.params.id);
     if (!venta) {
       return res.status(404).json({ msg: 'Venta no encontrada' });
-    }
-    
-    // Actualizar el stock para cada producto
-    for (const item of venta.productos) {
-      const producto = await Producto.findById(item.productoRef);
-      
-      // Encontrar la variante, color y talla exactos
-      const variante = producto.variantes.id(item.variante.id);
-      const color = variante.colores.id(item.color.id);
-      
-      if (item.talla?.id) {
-        // Producto con talla
-        const talla = color.tallas.id(item.talla.id);
-        talla.stock -= 1; // O la cantidad vendida
-      } else {
-        // Producto sin talla
-        color.stock -= 1; // O la cantidad vendida
-      }
-      
-      await producto.save();
     }
     
     // Marcar venta como liquidada
@@ -266,43 +247,222 @@ exports.agregarPago = async (req, res) => {
 };
 
 exports.actualizarEstadoVenta = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     const { id } = req.params;
     const { estado } = req.body;
+    const usuarioId = req.userId;
 
-    // Validar ID
+    // Validaciones básicas
     if (!mongoose.Types.ObjectId.isValid(id)) {
+      await session.abortTransaction();
       return res.status(400).json({ message: 'ID de venta no válido' });
     }
 
-    // Validar estado
-    const estadosPermitidos = ['pendiente', 'confirmado', 'preparado', 'entregado', 'devuelto'];
+    const estadosPermitidos = ['pendiente', 'confirmado', 'preparado', 'entregado', 'devuelto', 'liquidado'];
     if (!estadosPermitidos.includes(estado)) {
+      await session.abortTransaction();
       return res.status(400).json({ 
         message: 'Estado no válido',
         estadosPermitidos: estadosPermitidos
       });
     }
 
-    const venta = await Venta.findById(id);
+    // Obtener venta con bloqueo para evitar condiciones de carrera
+    const venta = await Venta.findById(id).session(session);
     if (!venta) {
+      await session.abortTransaction();
       return res.status(404).json({ message: 'Venta no encontrada' });
     }
 
-    // No permitir cambiar estado si ya está liquidada
-    if (venta.estado === 'liquidado') {
-      return res.status(400).json({ 
-        message: 'No se puede modificar el estado de una venta liquidada'
-      });
+    let infoProducto = '';
+
+    // 1. Manejo para cuando se marca como ENTREGADO
+    if (estado === 'entregado') {
+      for (const item of venta.productos) {
+        if (!item.productoRef) continue; // Saltar items temporales
+        
+        const producto = await Producto.findById(item.productoRef).session(session);
+        if (!producto) continue;
+        infoProducto += producto.nombre;
+
+        // Actualizar stock
+        if (item.variante?.id) {
+          const variante = producto.variantes.id(item.variante.id);
+          infoProducto += ' | ' + variante.tipo;
+          if (item.color?.id) {
+            const color = variante.colores.id(item.color.id);
+            infoProducto += ' | ' + color.color;
+            
+            if (item.talla?.id) {
+              // Producto con talla
+              const talla = color.tallas.id(item.talla.id);
+              infoProducto += ' | ' + talla.talla;
+              if (talla.stock < item.cantidad) {
+                await session.abortTransaction();
+                return res.status(400).json({
+                  message: `Stock insuficiente para el producto ${producto.nombre} (talla ${item.talla.nombre})`
+                });
+              }
+              talla.stock -= item.cantidad;
+            } else {
+              // Producto sin talla pero con color
+              if (color.stock < item.cantidad) {
+                await session.abortTransaction();
+                return res.status(400).json({
+                  message: `Stock insuficiente para el producto ${producto.nombre} (color ${item.color.nombre})`
+                });
+              }
+              color.stock -= item.cantidad;
+            }
+          } 
+        }
+
+        await producto.save();
+
+        // Registrar movimiento de inventario
+        const movimiento = new MovimientoInventario({
+          producto: item.productoRef,
+          variante: item.variante?.id,
+          color: item.color?.id,
+          talla: item.talla?.id,
+          productoInfo: infoProducto,
+          tipo: 'salida',
+          cantidad: item.cantidad,
+          motivo: 'venta',
+          referencia: {
+            tipo: 'Venta',
+            id: venta._id
+          },
+          usuario: usuarioId,
+          comentarios: `Venta #${venta._id}`
+        });
+        await movimiento.save({ session });
+      }
+    } else if (estado === 'devuelto') { // 2. Manejo para cuando se marca como DEVUELTO
+      // Buscar movimientos de inventario relacionados a esta venta
+      const movimientos = await MovimientoInventario.find({
+        'referencia.id': venta._id,
+        'referencia.tipo': 'Venta',
+        motivo: 'venta'
+      }).session(session);
+
+      if (movimientos.length > 0) {
+        // Si hay movimientos previos, actualizarlos a "pérdida"
+        for (const movimiento of movimientos) {
+          movimiento.motivo = 'perdida';
+          movimiento.comentarios = `Producto devuelto pero no reintegrado a inventario (Venta #${venta._id})`;
+          await movimiento.save({ session });
+        }
+      } else {
+        // Si no hay movimientos previos, crear nuevos como pérdida
+        for (const item of venta.productos) {
+          if (!item.productoRef) continue;
+
+          const producto = await Producto.findById(item.productoRef).session(session);
+          if (!producto) continue;
+
+          // Actualizar stock
+          if (item.variante?.id) {
+            const variante = producto.variantes.id(item.variante.id);
+            if (item.color?.id) {
+              const color = variante.colores.id(item.color.id);
+              
+              if (item.talla?.id) {
+                // Producto con talla
+                const talla = color.tallas.id(item.talla.id);
+                if (talla.stock < item.cantidad) {
+                  await session.abortTransaction();
+                  return res.status(400).json({
+                    message: `Stock insuficiente para el producto ${producto.nombre} (talla ${item.talla.nombre})`
+                  });
+                }
+                talla.stock -= item.cantidad;
+                infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + color.color + ' | ' + talla.talla;
+              } else {
+                // Producto sin talla pero con color
+                if (color.stock < item.cantidad) {
+                  await session.abortTransaction();
+                  return res.status(400).json({
+                    message: `Stock insuficiente para el producto ${producto.nombre} (color ${item.color.nombre})`
+                  });
+                }
+                color.stock -= item.cantidad;
+                infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + color.color;
+              }
+            } 
+          }
+          await producto.save();
+          
+          const movimiento = new MovimientoInventario({
+            producto: item.productoRef,
+            variante: item.variante?.id,
+            color: item.color?.id,
+            talla: item.talla?.id,
+            productoInfo: infoProducto,
+            tipo: 'salida',
+            cantidad: item.cantidad,
+            motivo: 'perdida',
+            referencia: {
+              tipo: 'Venta',
+              id: venta._id
+            },
+            usuario: usuarioId,
+            comentarios: `Producto devuelto marcado como pérdida (Venta #${venta._id})`
+          });
+          await movimiento.save({ session });
+        }
+      }
+    } else {
+      const movimientos = await MovimientoInventario.find({
+        'referencia.id': venta._id,
+        'referencia.tipo': 'Venta'
+      }).session(session);
+
+      // Revertir cada movimiento encontrado
+      for (const movimiento of movimientos) {
+        const producto = await Producto.findById(movimiento.producto).session(session);
+        if (!producto) continue;
+
+        // Revertir el stock según la estructura del producto
+        if (movimiento.talla) {
+          // Producto con talla específica
+          const variante = producto.variantes.id(movimiento.variante);
+          const color = variante.colores.id(movimiento.color);
+          const talla = color.tallas.id(movimiento.talla);
+          talla.stock += movimiento.cantidad;
+        } else if (movimiento.color) {
+          // Producto con color pero sin talla
+          const variante = producto.variantes.id(movimiento.variante);
+          const color = variante.colores.id(movimiento.color);
+          color.stock += movimiento.cantidad;
+        } else {
+          // Producto sin variantes específicas (no debería ocurrir según tu modelo)
+          continue;
+        }
+
+        await producto.save();
+        
+        // Eliminar el movimiento de inventario
+        await MovimientoInventario.deleteOne({ _id: movimiento._id }).session(session);
+      }
     }
 
-    // Actualizar estado
+    // Actualizar estado de la venta
     venta.estado = estado;
-    await venta.save();
+    
+    await venta.save({ session });
 
+    // Commit de la transacción
+    await session.commitTransaction();
+    
+    // Obtener venta actualizada para respuesta
     const ventaActualizada = await Venta.findById(id)
       .populate('cliente')
-      .populate('vendedor', 'nombre');
+      .populate('vendedor', 'nombre')
+      .session(session);
 
     res.status(200).json({
       success: true,
@@ -311,12 +471,15 @@ exports.actualizarEstadoVenta = async (req, res) => {
     });
 
   } catch (error) {
+    await session.abortTransaction();
     console.error("Error al actualizar estado de venta:", error);
     res.status(500).json({ 
       success: false,
       message: "Error al actualizar estado de venta",
       error: error.message 
     });
+  } finally {
+    session.endSession();
   }
 };
 
