@@ -1,4 +1,5 @@
 const Producto = require('../models/productosModel'); // Asegúrate de que este sea el modelo correcto
+const MovimientoInventario = require('../models/movimientosInventarioModel');
 
 // Listar productos
 const listarProductos = async (req, res) => {
@@ -121,80 +122,93 @@ const agregarVariantes = async (req, res) => {
     }
 };
 
-// Editar producto
-/*const editarProducto = async (req, res) => {
-    try {
-        const { productoId } = req.params.id;
-        const {
-            nombre,
-            descripcion,
-            categoria,
-            subcategoria,
-            calidad,
-            corte,
-            imagenes,
-            activo
-        } = req.body;
-
-        if (!productoId) {
-            return res.status(400).json({ message: "Producto ID es requerido" });
-        }
-
-        const producto = await Producto.findById(productoId);
-        if (!producto) {
-            return res.status(404).json({ message: "Producto no encontrado" });
-        }
-
-        producto.nombre = nombre || producto.nombre;
-        producto.descripcion = descripcion || producto.descripcion;
-        producto.categoria = categoria || producto.categoria;
-        producto.subcategoria = subcategoria || producto.subcategoria;
-        producto.calidad = calidad || producto.calidad;
-        producto.corte = corte || producto.corte;
-        producto.imagenes = imagenes || producto.imagenes;
-        producto.activo = activo !== undefined ? activo : producto.activo;
-
-        await producto.save();
-
-        res.status(200).json({ message: "Producto actualizado exitosamente", producto });
-    } catch (error) {
-        console.error("Error al editar producto:", error);
-        res.status(500).json({ message: "Error al editar producto", error });
-    }
-};*/
-
 const actualizarProductos = async (req, res) => {
     try {
-        const productosModificados = req.body; // Array de productos modificados
+        const productosModificados = req.body;
+        const usuario = req.userId; // Asumiendo que tienes el usuario en el request
 
         if (!Array.isArray(productosModificados)) {
             return res.status(400).json({ message: "Se esperaba un array de productos" });
         }
 
-        // Recorremos cada producto modificado
         for (const productoModificado of productosModificados) {
-            const { _id, ...datosActualizados } = productoModificado;
+            const { _id, variantes, ...otrosDatos } = productoModificado;
 
-            if (!_id) {
-                return res.status(400).json({ message: "Cada producto debe incluir un _id" });
-            }
-
-            // Buscamos el producto en la base de datos
-            const productoExistente = await Producto.findById(_id);
+            const productoExistente = await Producto.findById(_id)
+                .lean(); // Usamos lean() para obtener objeto plano
 
             if (!productoExistente) {
-                return res.status(404).json({ message: `Producto con id ${_id} no encontrado` });
+                continue; // O manejar el error como prefieras
             }
 
-            // Actualizamos solo los campos que han sido modificados
-            for (const [key, value] of Object.entries(datosActualizados)) {
-                if (value !== undefined) {
-                    productoExistente[key] = value;
+            // Actualizar datos básicos
+            const productoActualizado = await Producto.findByIdAndUpdate(
+                _id, 
+                { $set: otrosDatos },
+                { new: true }
+            );
+
+            // Comparar variantes para detectar cambios en stock
+            if (variantes && productoExistente.variantes) {
+                for (const varianteMod of variantes) {
+                    const varianteExistente = productoExistente.variantes.find(
+                        v => v._id.toString() === varianteMod._id
+                    );
+
+                    if (!varianteExistente) continue;
+
+                    for (const colorMod of varianteMod.colores) {
+                        const colorExistente = varianteExistente.colores.find(
+                            c => c._id.toString() === colorMod._id
+                        );
+
+                        if (!colorExistente) continue;
+
+                        // Productos sin tallas
+                        if (colorMod.stock !== undefined && colorMod.stock !== null) {
+                            const diferencia = colorMod.stock - (colorExistente.stock || 0);
+                            if (diferencia !== 0) {
+                                await registrarMovimiento(
+                                    _id,
+                                    varianteMod._id,
+                                    colorMod._id,
+                                    null, // No hay talla
+                                    diferencia,
+                                    usuario
+                                );
+                            }
+                        }
+                        // Productos con tallas
+                        else if (colorMod.tallas && colorExistente.tallas) {
+                            for (const tallaMod of colorMod.tallas) {
+                                const tallaExistente = colorExistente.tallas.find(
+                                    t => t._id.toString() === tallaMod._id
+                                );
+
+                                if (!tallaExistente) continue;
+
+                                const diferencia = tallaMod.stock - tallaExistente.stock;
+                                if (diferencia !== 0) {
+                                    await registrarMovimiento(
+                                        _id,
+                                        varianteMod._id,
+                                        colorMod._id,
+                                        tallaMod._id,
+                                        diferencia,
+                                        usuario
+                                    );
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            // Guardamos los cambios
-            await productoExistente.save();
+            // Actualizar variantes completas (reemplazar)
+            if (variantes) {
+                productoActualizado.variantes = variantes;
+                await productoActualizado.save();
+            }
         }
 
         res.status(200).json({ message: "Productos actualizados exitosamente" });
@@ -203,6 +217,28 @@ const actualizarProductos = async (req, res) => {
         res.status(500).json({ message: "Error al actualizar los productos", error });
     }
 };
+
+async function registrarMovimiento(productoId, varianteId, colorId, tallaId, diferencia, usuarioId) {
+    const producto = await Producto.findById(productoId).lean();
+    let productoInfo = producto.nombre;
+    
+    // Construir info de variante/color/talla si es necesario
+    // ...
+
+    const movimiento = new MovimientoInventario({
+        producto: productoId,
+        variante: varianteId,
+        color: colorId,
+        talla: tallaId,
+        productoInfo,
+        tipo: diferencia > 0 ? 'entrada' : 'salida',
+        cantidad: Math.abs(diferencia),
+        motivo: diferencia > 0 ? 'compra' : 'ajuste',
+        usuario: usuarioId
+    });
+
+    await movimiento.save();
+}
 
 const agregarVariante = async (req, res) => {
     try {
