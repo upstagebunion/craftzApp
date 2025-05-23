@@ -188,7 +188,7 @@ exports.agregarPago = async (req, res) => {
     }
 
     // No permitir pagos si ya está liquidada
-    if (venta.estado === 'liquidado') {
+    if (venta.liquidado === true) {
       return res.status(400).json({ 
         message: 'No se pueden agregar pagos a una venta liquidada'
       });
@@ -219,7 +219,7 @@ exports.agregarPago = async (req, res) => {
 
     // Verificar si se liquidó completamente
     if (nuevoRestante === 0) {
-      venta.estado = 'liquidado';
+      venta.liquidado = true;
       venta.fechaLiquidacion = new Date();
     }
 
@@ -261,7 +261,7 @@ exports.actualizarEstadoVenta = async (req, res) => {
       return res.status(400).json({ message: 'ID de venta no válido' });
     }
 
-    const estadosPermitidos = ['pendiente', 'confirmado', 'preparado', 'entregado', 'devuelto', 'liquidado'];
+    const estadosPermitidos = ['pendiente', 'confirmado', 'preparado', 'entregado', 'devuelto'];
     if (!estadosPermitidos.includes(estado)) {
       await session.abortTransaction();
       return res.status(400).json({ 
@@ -552,7 +552,7 @@ exports.liquidarVenta = async (req, res) => {
     }
 
     // Verificar si ya está liquidada
-    if (venta.estado === 'liquidado') {
+    if (venta.liquidado === true) {
       return res.status(400).json({ 
         message: 'La venta ya está liquidada',
         fechaLiquidacion: venta.fechaLiquidacion
@@ -568,7 +568,7 @@ exports.liquidarVenta = async (req, res) => {
     }
 
     // Liquidar venta
-    venta.estado = 'liquidado';
+    venta.liquidado = true;
     venta.fechaLiquidacion = new Date();
     await venta.save();
 

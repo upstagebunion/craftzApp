@@ -5,7 +5,10 @@ const moment = require('moment');
 const Venta = require('../models/ventasModel');
 const Producto = require('../models/productosModel');
 const Cliente = require('../models/clienteModel');
-//const MovimientoInventario = require('../models/movimientosInventarioModel');
+const MovimientoInventario = require('../models/movimientosInventarioModel');
+const puppeteer = require('puppeteer');
+const handlebars = require('handlebars');
+const fs = require('fs').promises;
 
 exports.generarReporteVentasPDF = (tipo) => async (req, res) => {
   try {
@@ -246,5 +249,133 @@ exports.getVentasStatsByDateRange = async (req, res) => {
       message: 'Error interno del servidor al obtener estadísticas de ventas.',
       error: error.message
     });
+  }
+};
+
+exports.generarReporteInventarioPDF = (tipo, filtros = {}) => async (req, res) => {
+  try {
+    // Configurar fechas según el tipo de reporte
+    let fechaInicio, fechaFin;
+    const hoy = new Date();
+    
+    // Aplicar filtros de fecha
+    if (tipo === 'personalizado' && filtros.fechaInicio && filtros.fechaFin) {
+      fechaInicio = moment(filtros.fechaInicio).startOf('day').toDate();
+      fechaFin = moment(filtros.fechaFin).endOf('day').toDate();
+    } else if (tipo === 'diario') {
+      fechaInicio = moment().startOf('day').toDate();
+      fechaFin = moment().endOf('day').toDate();
+    } else if (tipo === 'semanal') {
+      fechaInicio = moment().startOf('week').toDate();
+      fechaFin = moment().endOf('week').toDate();
+    } else { // mensual por defecto
+      fechaInicio = moment().startOf('month').toDate();
+      fechaFin = moment().endOf('month').toDate();
+    }
+
+    // Construir query basado en filtros
+    const query = {
+      fecha: { $gte: fechaInicio, $lte: fechaFin }
+    };
+
+    // Aplicar filtros adicionales
+    if (filtros.tipoMovimiento) {
+      query.tipo = filtros.tipoMovimiento; // 'entrada' o 'salida'
+    }
+    
+    if (filtros.motivo && filtros.motivo.length > 0) {
+      query.motivo = { $in: filtros.motivo }; // ['compra', 'venta', etc.]
+    }
+
+    // Consultar movimientos
+    const movimientos = await MovimientoInventario.find(query)
+      .sort({ fecha: -1 })
+      .populate('usuario', 'nombre')
+      .lean();
+
+    // Crear PDF
+    const totalEntradas = movimientos.filter(m => m.tipo === 'entrada').reduce((sum, m) => sum + m.cantidad, 0);
+    const totalSalidas = movimientos.filter(m => m.tipo === 'salida').reduce((sum, m) => sum + m.cantidad, 0);
+    const saldo = totalEntradas - totalSalidas;
+
+    const motivos = {
+      compra: movimientos.filter(m => m.motivo === 'compra').length,
+      venta: movimientos.filter(m => m.motivo === 'venta').length,
+      ajuste: movimientos.filter(m => m.motivo === 'ajuste').length,
+      devolucion: movimientos.filter(m => m.motivo === 'devolucion').length,
+      perdida: movimientos.filter(m => m.motivo === 'perdida').length
+    };
+
+    // 1. Cargar plantilla HTML
+    const templateHtml = await fs.readFile('app/templates/reporte-inventario.html', 'utf8');
+    
+    // 2. Compilar con Handlebars
+    const template = handlebars.compile(templateHtml);
+    
+    // 3. Preparar datos para la plantilla
+    const data = {
+      titulo: `Reporte de Inventario ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`,
+      fechaGeneracion: moment().format('LLL'),
+      periodo: `Del ${moment(fechaInicio).format('LL')} al ${moment(fechaFin).format('LL')}`,
+      //logoUrl: 'file://' + require('path').resolve('public/images/logo.png'),
+      
+      // Estadísticas
+      resumen: {
+        totalEntradas,
+        totalSalidas,
+        saldo,
+        totalMovimientos: movimientos.length
+      },
+      
+      // Distribución por motivos
+      motivos: Object.entries(motivos)
+        .filter(([_, cantidad]) => cantidad > 0)
+        .map(([motivo, cantidad]) => ({
+          nombre: motivo.charAt(0).toUpperCase() + motivo.slice(1),
+          cantidad,
+          porcentaje: ((cantidad / movimientos.length) * 100).toFixed(1)
+        })),
+      
+      // Detalle de movimientos
+      movimientos: movimientos.map(m => ({
+        fecha: moment(m.fecha).format('DD/MM/YY HH:mm'),
+        producto: m.productoInfo,
+        cantidad: m.cantidad,
+        tipo: m.tipo === 'entrada' ? 'Entrada' : 'Salida',
+        tipoClase: m.tipo === 'entrada' ? 'entrada' : 'salida',
+        motivo: m.motivo.charAt(0).toUpperCase() + m.motivo.slice(1),
+        usuario: m.usuario?.nombre || 'Sistema'
+      }))
+    };
+
+    // 4. Renderizar HTML
+    const html = template(data);
+    
+    // 5. Configurar Puppeteer
+    const browser = await puppeteer.launch({ 
+      headless: false,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'] // Para entornos Linux
+    });
+    const page = await browser.newPage();
+    
+    // 6. Configurar contenido y generar PDF
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.emulateMediaType('screen');
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      margin: { top: '30mm', right: '20mm', bottom: '30mm', left: '20mm' },
+      printBackground: true,
+      displayHeaderFooter: false // Lo manejamos en el HTML
+    });
+    
+    await browser.close();
+    
+    // 7. Enviar PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=reporte_inventario_${tipo}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error al generar reporte de inventario:', error);
+    res.status(500).json({ error: 'Error al generar el reporte', detalles: error.message });
   }
 };

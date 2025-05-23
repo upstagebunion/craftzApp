@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte de Inventario</title>
+  <style>
+    /* Estilos base */
+    body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; }
+    .page { padding: 20mm 15mm; }
+    
+    /* Encabezado */
+    .header { display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 15px; }
+    .logo { width: 50px; height: auto; margin-right: 15px; }
+    .header-text { flex: 1; }
+    .title { color: #0066cc; font-size: 22px; margin: 0 0 5px 0; }
+    .subtitle { color: #666; font-size: 14px; margin: 0; }
+    
+    /* Resumen estadístico */
+    .resumen-section { margin-bottom: 25px; }
+    .resumen-title { font-size: 16px; color: #0066cc; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; }
+    .resumen-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
+    .resumen-card { background: #f9f9f9; border-radius: 5px; padding: 10px; text-align: center; }
+    .resumen-card h3 { margin: 0 0 5px 0; font-size: 14px; color: #666; }
+    .resumen-card p { margin: 0; font-size: 18px; font-weight: bold; }
+    .entrada { color: #28a745; }
+    .salida { color: #dc3545; }
+    
+    /* Motivos */
+    .motivos-list { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+    .motivo-tag { background: #e9ecef; padding: 5px 10px; border-radius: 20px; font-size: 12px; }
+    
+    /* Tabla de movimientos */
+    .movimientos-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .movimientos-table th { background-color: #0066cc; color: white; padding: 10px; text-align: left; }
+    .movimientos-table td { padding: 8px 10px; border-bottom: 1px solid #ddd; }
+    .movimientos-table tr:nth-child(even) { background-color: #f9f9f9; }
+    
+    /* Footer */
+    .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
+    
+    /* Clases utilitarias */
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Encabezado -->
+    <div class="header">
+      {{#if logoUrl}}
+      <!-- <img src="{{logoUrl}}" class="logo" alt="Logo"> -->
+      {{/if}}
+      <div class="header-text">
+        <h1 class="title">{{titulo}}</h1>
+        <p class="subtitle">{{periodo}} | Generado el {{fechaGeneracion}}</p>
+      </div>
+    </div>
+    
+    <!-- Resumen estadístico -->
+    <div class="resumen-section">
+      <h2 class="resumen-title">Resumen Estadístico</h2>
+      <div class="resumen-grid">
+        <div class="resumen-card">
+          <h3>Total Entradas</h3>
+          <p class="entrada">{{resumen.totalEntradas}} unidades</p>
+        </div>
+        <div class="resumen-card">
+          <h3>Total Salidas</h3>
+          <p class="salida">{{resumen.totalSalidas}} unidades</p>
+        </div>
+        <div class="resumen-card">
+          <h3>Saldo Neto</h3>
+          <p>{{resumen.saldo}} unidades</p>
+        </div>
+      </div>
+      
+      <h3>Distribución por Motivos</h3>
+      <div class="motivos-list">
+        {{#each motivos}}
+        <span class="motivo-tag">{{nombre}}: {{cantidad}} ({{porcentaje}}%)</span>
+        {{/each}}
+      </div>
+    </div>
+    
+    <!-- Tabla de movimientos -->
+    <h2 class="resumen-title">Detalle de Movimientos</h2>
+    <table class="movimientos-table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Producto</th>
+          <th class="text-right">Cantidad</th>
+          <th>Tipo</th>
+          <th>Motivo</th>
+          <th>Usuario</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each movimientos}}
+        <tr>
+          <td>{{fecha}}</td>
+          <td>{{producto}}</td>
+          <td class="text-right">{{cantidad}}</td>
+          <td><span class="{{tipoClase}}">{{tipo}}</span></td>
+          <td>{{motivo}}</td>
+          <td>{{usuario}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    
+    <!-- Pie de página -->
+    <div class="footer">
+      Página <span class="pageNumber"></span> de <span class="totalPages"></span> • Sistema de Inventario
+    </div>
+  </div>
+
+  <!-- Script para numeración de páginas (Puppeteer lo ejecutará) -->
+  <script>
+    // Numeración de páginas
+    document.addEventListener('DOMContentLoaded', function() {
+      const totalPages = Math.ceil(document.body.scrollHeight / window.innerHeight);
+      document.querySelector('.totalPages').textContent = totalPages;
+      
+      // Esta parte se completa cuando Puppeteer procesa cada página
+      const pageNumbers = document.querySelectorAll('.pageNumber');
+      for (let i = 0; i < pageNumbers.length; i++) {
+        pageNumbers[i].textContent = i + 1;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -78,8 +78,12 @@ const VentaSchema = new mongoose.Schema({
   }],
   estado: {
     type: String,
-    enum: ['pendiente', 'confirmado', 'preparado', 'liquidado', 'entregado', 'devuelto'],
+    enum: ['pendiente', 'confirmado', 'preparado', 'entregado', 'devuelto'],
     default: 'pendiente'
+  },
+  liquidado: {
+    type: Boolean,
+    default: false
   },
   pagos: [{
     razon: String,

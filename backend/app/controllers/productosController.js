@@ -1,5 +1,6 @@
-const Producto = require('../models/productosModel'); // Asegúrate de que este sea el modelo correcto
+const Producto = require('../models/productosModel');
 const MovimientoInventario = require('../models/movimientosInventarioModel');
+const mongoose = require("mongoose");
 
 // Listar productos
 const listarProductos = async (req, res) => {
@@ -126,6 +127,7 @@ const actualizarProductos = async (req, res) => {
     try {
         const productosModificados = req.body;
         const usuario = req.userId; // Asumiendo que tienes el usuario en el request
+        let productoInfo = '';
 
         if (!Array.isArray(productosModificados)) {
             return res.status(400).json({ message: "Se esperaba un array de productos" });
@@ -147,6 +149,7 @@ const actualizarProductos = async (req, res) => {
                 { $set: otrosDatos },
                 { new: true }
             );
+            productoInfo += productoActualizado.nombre;
 
             // Comparar variantes para detectar cambios en stock
             if (variantes && productoExistente.variantes) {
@@ -157,12 +160,14 @@ const actualizarProductos = async (req, res) => {
 
                     if (!varianteExistente) continue;
 
+                    productoInfo += ' | ' + varianteExistente.tipo;
                     for (const colorMod of varianteMod.colores) {
                         const colorExistente = varianteExistente.colores.find(
                             c => c._id.toString() === colorMod._id
                         );
 
                         if (!colorExistente) continue;
+                        productoInfo += ' | ' + colorExistente.color;
 
                         // Productos sin tallas
                         if (colorMod.stock !== undefined && colorMod.stock !== null) {
@@ -174,7 +179,8 @@ const actualizarProductos = async (req, res) => {
                                     colorMod._id,
                                     null, // No hay talla
                                     diferencia,
-                                    usuario
+                                    usuario,
+                                    productoInfo
                                 );
                             }
                         }
@@ -187,6 +193,8 @@ const actualizarProductos = async (req, res) => {
 
                                 if (!tallaExistente) continue;
 
+                                productoInfo += ' | ' + tallaExistente.talla;
+
                                 const diferencia = tallaMod.stock - tallaExistente.stock;
                                 if (diferencia !== 0) {
                                     await registrarMovimiento(
@@ -195,7 +203,8 @@ const actualizarProductos = async (req, res) => {
                                         colorMod._id,
                                         tallaMod._id,
                                         diferencia,
-                                        usuario
+                                        usuario,
+                                        productoInfo
                                     );
                                 }
                             }
@@ -218,13 +227,7 @@ const actualizarProductos = async (req, res) => {
     }
 };
 
-async function registrarMovimiento(productoId, varianteId, colorId, tallaId, diferencia, usuarioId) {
-    const producto = await Producto.findById(productoId).lean();
-    let productoInfo = producto.nombre;
-    
-    // Construir info de variante/color/talla si es necesario
-    // ...
-
+async function registrarMovimiento(productoId, varianteId, colorId, tallaId, diferencia, usuarioId, productoInfo) {
     const movimiento = new MovimientoInventario({
         producto: productoId,
         variante: varianteId,
@@ -276,9 +279,15 @@ const agregarVariante = async (req, res) => {
     try {
       const { id, variante } = req.params; // ID del producto y ID de la variante
       const { color, stock, costo } = req.body; // Datos del nuevo color
+      const usuario = req.userId;
+      let productoInfo = '';
   
       // Buscar el producto en la base de datos
-      const producto = await Producto.findById(id);
+      const producto = await Producto.findById(id)
+        .populate('subcategoria')
+        .exec();
+
+      productoInfo += producto.nombre;
   
       if (!producto) {
         return res.status(404).json({ message: "Producto no encontrado" });
@@ -286,6 +295,7 @@ const agregarVariante = async (req, res) => {
   
       // Buscar la variante en el producto
       const varianteExistente = producto.variantes.id(variante);
+      productoInfo += ', ' + varianteExistente.tipo;
   
       if (!varianteExistente) {
         return res.status(404).json({ message: "Variante no encontrada" });
@@ -294,19 +304,45 @@ const agregarVariante = async (req, res) => {
       // Crear el nuevo color
       const nuevoColor = {
         color,
-        stock,
-        costo,
         tallas: [],
+        _id: new mongoose.Types.ObjectId()
       };
+
+      if (!producto.subcategoria.usaTallas) {
+        if (stock && stock > 0 && costo) {
+            nuevoColor.stock = stock;
+            nuevoColor.costo = costo;
+        } else {
+            return res.status(400).json({ 
+                message: "Debe proporcionar un stock válido (mayor a 0)" 
+            });
+        }
+      }
   
       // Agregar el color a la variante
       varianteExistente.colores.push(nuevoColor);
+      productoInfo += ', ' + color;
   
       // Guardar el producto actualizado
       await producto.save();
+
+      if (!producto.subcategoria.usaTallas && stock > 0) {
+          await registrarMovimiento(
+              producto._id,
+              varianteExistente._id,
+              nuevoColor._id,
+              null, // No hay talla
+              stock,
+              usuario,
+              producto.nombre,
+              productoInfo
+          );
+      }
+
+      const productoRespuesta = await Producto.findById(id);
   
       // Devolver el producto actualizado
-      res.status(200).json(producto);
+      res.status(200).json(productoRespuesta);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Error al agregar el color", error });
@@ -317,12 +353,21 @@ const agregarVariante = async (req, res) => {
     try {
       const { id, variante, color } = req.params; // ID del producto, variante y color
       const { talla, stock, costo } = req.body; // Datos de la nueva talla
+      const usuario = req.userId;
   
       // Buscar el producto en la base de datos
-      const producto = await Producto.findById(id);
+      const producto = await Producto.findById(id)
+        .populate('subcategoria')
+        .exec();
   
       if (!producto) {
         return res.status(404).json({ message: "Producto no encontrado" });
+      }
+
+      if (!producto.subcategoria.usaTallas) {
+        return res.status(400).json({ 
+          message: "Esta subcategoría no permite tallas" 
+        });
       }
   
       // Buscar la variante en el producto
@@ -344,6 +389,7 @@ const agregarVariante = async (req, res) => {
         talla,
         stock,
         costo,
+        _id: new mongoose.Types.ObjectId()
       };
   
       // Agregar la talla al color
@@ -351,9 +397,23 @@ const agregarVariante = async (req, res) => {
   
       // Guardar el producto actualizado
       await producto.save();
+
+      let productoInfo = producto.nombre + ' | ' + varianteExistente.tipo + ' | ' + colorExistente.color + ' | ' + talla;
+      await registrarMovimiento(
+        producto._id,
+        varianteExistente._id,
+        colorExistente._id,
+        nuevaTalla._id,
+        stock,
+        usuario,
+        producto.nombre,
+        productoInfo,
+      );
+
+      const productoRespuesta = await Producto.findById(id);
   
       // Devolver el producto actualizado
-      res.status(200).json(producto);
+      res.status(200).json(productoRespuesta);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: "Error al agregar la talla", error });
