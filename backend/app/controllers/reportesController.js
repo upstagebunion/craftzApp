@@ -1,5 +1,4 @@
 // controllers/reportesController.js
-const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const moment = require('moment');
 const Venta = require('../models/ventasModel');
@@ -7,7 +6,8 @@ const Producto = require('../models/productosModel');
 const Cotizacion = require('../models/cotizacionModel');
 const Cliente = require('../models/clienteModel');
 const MovimientoInventario = require('../models/movimientosInventarioModel');
-const puppeteer = require('puppeteer');
+const { getLaunchOptions } = require('../../chromium-config');
+const puppeteer = require('puppeteer-core');
 const handlebars = require('handlebars');
 const fs = require('fs').promises;
 const fss = require('fs');
@@ -15,6 +15,7 @@ const path = require('path');
 
 exports.generarReporteVentasPDF = (tipo) => async (req, res) => {
   try {
+    const launchOptions = await getLaunchOptions();
     // Configurar fechas según el tipo de reporte
     let fechaInicio, fechaFin;
     const hoy = new Date();
@@ -89,10 +90,7 @@ exports.generarReporteVentasPDF = (tipo) => async (req, res) => {
     const html = template(data);
     
     // Configurar Puppeteer y generar PDF
-    const browser = await puppeteer.launch({ 
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    const browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
     await page.setContent(html, { waitUntil: 'networkidle0' });
@@ -294,6 +292,7 @@ exports.getVentasStatsByDateRange = async (req, res) => {
 
 exports.generarReporteInventarioPDF = (tipo, filtros = {}) => async (req, res) => {
   try {
+    const launchOptions = await getLaunchOptions();
     // Configurar fechas según el tipo de reporte
     let fechaInicio, fechaFin;
     const hoy = new Date();
@@ -394,10 +393,7 @@ exports.generarReporteInventarioPDF = (tipo, filtros = {}) => async (req, res) =
     const html = template(data);
     
     // 5. Configurar Puppeteer
-    const browser = await puppeteer.launch({ 
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] // Para entornos Linux
-    });
+    const browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
     
     // 6. Configurar contenido y generar PDF
@@ -577,10 +573,7 @@ exports.generarReciboCotizacionPDF = async (req, res) => {
     const html = template(data);
     
     // 7. Configurar Puppeteer y generar PDF
-    const browser = await puppeteer.launch({ 
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    const browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
     
     await page.setContent(html, { waitUntil: 'networkidle0' });
@@ -605,6 +598,7 @@ exports.generarReciboCotizacionPDF = async (req, res) => {
 
 exports.generarReciboVentaPDF = async (req, res) => {
   try {
+    const launchOptions = await getLaunchOptions();
     const { id } = req.params;
 
     // Obtener la venta con los datos poblados
@@ -779,10 +773,7 @@ exports.generarReciboVentaPDF = async (req, res) => {
     const html = template(data);
     
     // Configurar Puppeteer y generar PDF
-    const browser = await puppeteer.launch({ 
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    const browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
     
     await page.setContent(html, { waitUntil: 'networkidle0' });
