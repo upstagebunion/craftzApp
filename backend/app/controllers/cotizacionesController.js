@@ -105,6 +105,7 @@ exports.actualizarCotizacion = async (req, res) => {
   try {
     const { id } = req.params;
     const cotizacionData = req.body;
+    const vendedor = req.userId;
 
     // Validar ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -126,7 +127,7 @@ exports.actualizarCotizacion = async (req, res) => {
     // Actualizar
     const cotizacionActualizada = await Cotizacion.findByIdAndUpdate(
       id,
-      { ...cotizacionData },
+      { vendedor, ...cotizacionData },
       { new: true, runValidators: true }
     );
 

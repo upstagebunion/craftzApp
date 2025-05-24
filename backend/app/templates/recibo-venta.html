@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Recibo de Venta</title>
+  <style>
+    /* Estilos base */
+    body { 
+      font-family: 'Arial', sans-serif; 
+      margin: 0; 
+      padding: 0; 
+      color: #333; 
+      font-size: 14px;
+    }
+    .page { 
+      padding: 0 15mm; 
+    }
+    
+    /* Encabezado */
+    .header { 
+      display: flex; 
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px; 
+      border-bottom: 2px solid #292662; 
+      padding-bottom: 15px; 
+    }
+    .logo { 
+      width: 150px; 
+      height: auto;
+    }
+    .header-info {
+      text-align: right;
+    }
+    .title { 
+      color: #292662; 
+      font-size: 24px; 
+      margin: 0 0 5px 0; 
+      font-weight: bold;
+    }
+    .subtitle { 
+      color: #666; 
+      font-size: 14px; 
+      margin: 0; 
+    }
+    .folio {
+      background: #292662;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    
+    /* Información de cliente y vendedor */
+    .info-section {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 25px;
+    }
+    .info-card {
+      width: 48%;
+      padding: 10px;
+      border-radius: 5px;
+      background: #f9f9f9;
+    }
+    .info-card h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      color: #292662;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 5px;
+    }
+    .info-item {
+      margin-bottom: 5px;
+    }
+    .info-label {
+      font-weight: bold;
+      display: inline-block;
+      width: 80px;
+    }
+    
+    /* Estado de la venta */
+    .estado-venta {
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-weight: bold;
+      display: inline-block;
+      margin-bottom: 15px;
+    }
+    .estado-pendiente { background: #fff3cd; color: #856404; }
+    .estado-confirmado { background: #cce5ff; color: #004085; }
+    .estado-preparado { background: #d4edda; color: #155724; }
+    .estado-entregado { background: #d1ecf1; color: #0c5460; }
+    .estado-devuelto { background: #f8d7da; color: #721c24; }
+    
+    /* Tabla de productos */
+    .productos-table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 15px;
+      margin-bottom: 20px;
+    }
+    .productos-table th { 
+      background-color: #292662; 
+      color: white; 
+      padding: 10px; 
+      text-align: left; 
+    }
+    .productos-table td { 
+      padding: 8px 10px; 
+      border-bottom: 1px solid #ddd; 
+      vertical-align: top;
+    }
+    .productos-table tr:nth-child(even) { 
+      background-color: #f9f9f9; 
+    }
+    
+    /* Estilos para extras */
+    .extras-list {
+      margin: 5px 0 0 0;
+      padding-left: 15px;
+    }
+    .extra-item {
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 3px;
+    }
+    
+    /* Resumen total */
+    .resumen-total {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f7ff;
+      border-radius: 5px;
+      border: 1px solid #d0e3ff;
+    }
+    .total-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .total-item {
+      display: flex;
+      justify-content: space-between;
+    }
+    .total-label {
+      font-weight: bold;
+    }
+    .total-value {
+      font-weight: bold;
+      color: #292662;
+    }
+    .gran-total {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 2px solid #292662;
+      font-size: 18px;
+    }
+    
+    /* Descuentos */
+    .descuento {
+      color: #dc3545;
+      font-size: 12px;
+    }
+    
+    /* Pagos */
+    .pagos-section {
+      margin-top: 20px;
+    }
+    .pagos-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .pagos-table th {
+      background: #e9ecef;
+      padding: 8px 10px;
+      text-align: left;
+    }
+    .pagos-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    /* Notas */
+    .notas {
+      margin-top: 30px;
+      padding: 10px;
+      font-size: 12px;
+      color: #666;
+      border-top: 1px solid #eee;
+    }
+    
+    /* Footer */
+    .footer { 
+      margin-top: 30px; 
+      text-align: center; 
+      font-size: 10px; 
+      color: #999; 
+      border-top: 1px solid #eee; 
+      padding-top: 10px; 
+    }
+    
+    /* Clases utilitarias */
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .text-bold { font-weight: bold; }
+    .mb-10 { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Encabezado -->
+    <div class="header">
+      <div>
+        {{#if logoUrl}}
+          <img src="{{logoUrl}}" class="logo" alt="Logo">
+        {{/if}}
+        <h2 class="subtitle">Recibo de venta</h2>
+      </div>
+      <div class="header-info">
+        <h1 class="title">{{titulo}}</h1>
+        <p class="subtitle">Folio: <span class="folio">{{folio}}</span></p>
+        <p class="subtitle">Fecha: {{fechaGeneracion}}</p>
+      </div>
+    </div>
+    
+    <!-- Estado de la venta -->
+    <div class="estado-venta estado-{{resumen.estado}}">
+      Estado: {{estado}}
+      {{#if esLiquidado}} • Liquidado {{#if fechaLiquidacion}}el {{fechaLiquidacion}}{{/if}}{{/if}}
+    </div>
+    
+    <!-- Información de cliente y vendedor -->
+    <div class="info-section">
+      <div class="info-card">
+        <h3>Cliente</h3>
+        <div class="info-item">
+          <span class="info-label">Nombre:</span> {{cliente.nombre}}
+        </div>
+        <div class="info-item">
+          <span class="info-label">Contacto:</span> {{cliente.contacto}}
+        </div>
+      </div>
+      
+      <div class="info-card">
+        <h3>Vendedor</h3>
+        <div class="info-item">
+          <span class="info-label">Nombre:</span> {{vendedor.nombre}}
+        </div>
+        <div class="info-item">
+          <span class="info-label">Contacto:</span> 477-838-9660
+        </div>
+      </div>
+    </div>
+    
+    <!-- Tabla de productos -->
+    <h3 class="mb-10">Detalle de Productos</h3>
+    <table class="productos-table">
+      <thead>
+        <tr>
+          <th width="5%">Cant.</th>
+          <th width="35%">Producto</th>
+          <th width="20%">Variante/Detalles</th>
+          <th width="15%" class="text-right">P. Unitario</th>
+          <th width="15%" class="text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each productos}}
+        <tr>
+          <td class="text-center">{{cantidad}}</td>
+          <td>
+            <div class="text-bold">{{nombre}}</div>
+            <div>{{descripcion}}</div>
+            {{#if descuento}}
+              <div class="descuento">
+                Descuento: {{descuento.valor}} ({{descuento.razon}})
+              </div>
+            {{/if}}
+            {{#if extras.length}}
+              <ul class="extras-list">
+                {{#each extras}}
+                <li class="extra-item">
+                  + {{nombre}}: {{cantidad}} (${{precio}})
+                </li>
+                {{/each}}
+              </ul>
+            {{/if}}
+          </td>
+          <td>{{variante}}</td>
+          <td class="text-right">${{precioUnitario}}</td>
+          <td class="text-right">${{precioFinal}}</td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    
+    <!-- Resumen total -->
+    <div class="resumen-total">
+      <div class="total-grid">
+        <div class="total-item">
+          <span class="total-label">Subtotal:</span>
+          <span class="total-value">${{resumen.subTotal}}</span>
+        </div>
+        <div class="total-item">
+          <span class="total-label">Productos:</span>
+          <span class="total-value">{{resumen.totalProductos}}</span>
+        </div>
+        {{#if resumen.descuentoGlobal}}
+        <div class="total-item">
+          <span class="total-label">Descuento:</span>
+          <span class="total-value">{{resumen.descuentoGlobal.valor}} ({{resumen.descuentoGlobal.razon}})</span>
+        </div>
+        {{/if}}
+      </div>
+      <div class="total-item gran-total">
+        <span class="total-label">TOTAL:</span>
+        <span class="total-value">${{resumen.total}}</span>
+      </div>
+      {{#if mostrarRestante}}
+      <div class="total-item" style="color: #dc3545; font-weight: bold;">
+        <span class="total-label">RESTANTE:</span>
+        <span class="total-value">${{resumen.restante}}</span>
+      </div>
+      {{/if}}
+    </div>
+    
+    <!-- Sección de pagos si existen -->
+    {{#if resumen.pagos.length}}
+    <div class="pagos-section">
+      <h3 class="mb-10">Detalle de Pagos</h3>
+      <table class="pagos-table">
+        <thead>
+          <tr>
+            <th width="30%">Fecha</th>
+            <th width="30%">Método</th>
+            <th width="30%">Razón</th>
+            <th width="10%" class="text-right">Monto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each resumen.pagos}}
+          <tr>
+            <td>{{fecha}}</td>
+            <td>{{metodo}}</td>
+            <td>{{razon}}</td>
+            <td class="text-right">${{monto}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{/if}}
+    
+    <!-- Notas -->
+    <div class="notas">
+      <p>{{nota}}</p>
+    </div>
+    
+    <!-- Pie de página -->
+    <div class="footer">
+      Página <span class="pageNumber"></span> de <span class="totalPages"></span> • Gracias por su preferencia
+    </div>
+  </div>
+
+  <!-- Script para numeración de páginas -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const totalPages = Math.ceil(document.body.scrollHeight / window.innerHeight);
+      document.querySelector('.totalPages').textContent = totalPages;
+      
+      const pageNumbers = document.querySelectorAll('.pageNumber');
+      for (let i = 0; i < pageNumbers.length; i++) {
+        pageNumbers[i].textContent = i + 1;
+      }
+    });
+  </script>
+</body>
+</html>

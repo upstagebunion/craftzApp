@@ -92,7 +92,6 @@ exports.crearCostoElaboracion = async (req, res) => {
 exports.obtenerCostosElaboracion = async (req, res) => {
   try {
     const costos = await CostoElaboracion.find()
-      .populate('subcategoriasAplica', 'nombre descripcion')
       .sort({ 
         tipoAplicacion: 1, 
         prioridad: 1,
@@ -117,7 +116,6 @@ exports.obtenerCostosElaboracion = async (req, res) => {
 exports.obtenerCostoElaboracion = async (req, res) => {
   try {
     const costo = await CostoElaboracion.findById(req.params.id)
-      .populate('subcategoriasAplica', 'nombre descripcion');
 
     if (!costo) {
       return res.status(404).json({
@@ -186,11 +184,11 @@ exports.actualizarCostoElaboracion = async (req, res) => {
       req.params.id,
       datosActualizacion,
       { new: true, runValidators: true }
-    ).populate('subcategoriasAplica', 'nombre descripcion');
+    )
 
     res.json({
       success: true,
-      data: costoActualizado,
+      costo: costoActualizado,
       message: "Costo de elaboración actualizado exitosamente"
     });
   } catch (error) {

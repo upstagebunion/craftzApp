@@ -4,11 +4,14 @@ const ExcelJS = require('exceljs');
 const moment = require('moment');
 const Venta = require('../models/ventasModel');
 const Producto = require('../models/productosModel');
+const Cotizacion = require('../models/cotizacionModel');
 const Cliente = require('../models/clienteModel');
 const MovimientoInventario = require('../models/movimientosInventarioModel');
 const puppeteer = require('puppeteer');
 const handlebars = require('handlebars');
 const fs = require('fs').promises;
+const fss = require('fs');
+const path = require('path');
 
 exports.generarReporteVentasPDF = (tipo) => async (req, res) => {
   try {
@@ -30,54 +33,91 @@ exports.generarReporteVentasPDF = (tipo) => async (req, res) => {
     // Consultar ventas en el rango de fechas
     const ventas = await Venta.find({
       fechaCreacion: { $gte: fechaInicio, $lte: fechaFin }
-    }).populate('cliente vendedor');
+    }).populate('cliente vendedor').sort({ fechaCreacion: 1 });
     
-    // Crear PDF
-    const doc = new PDFDocument();
+    // Calcular estadísticas
+    const totalVentas = ventas.reduce((sum, venta) => sum + (venta.total || 0), 0);
+    const cantidadVentas = ventas.length;
+    const promedioVenta = cantidadVentas > 0 ? totalVentas / cantidadVentas : 0;
+
+    // Procesar datos para la plantilla
+    const ventasFormateadas = ventas.map(venta => ({
+      fecha: moment(venta.fechaCreacion).format('DD/MM/YY HH:mm'),
+      cliente: venta.cliente?.nombre || 'Cliente no especificado',
+      vendedor: venta.vendedor?.nombre || 'Vendedor no especificado',
+      total: (venta.total || 0).toFixed(2),
+      estado: venta.estado || 'pendiente',
+      id: venta._id.toString().substring(18, 24)
+    }));
+
+    // Cargar plantilla HTML
+    const templateHtml = await fs.readFile('app/templates/reporte-ventas.html', 'utf8');
+    
+    // Registrar helpers necesarios
+    handlebars.registerHelper('formatMoney', function(value) {
+      if (typeof value !== 'number' || isNaN(value)) return '$0.00';
+      return `$${value.toFixed(2)}`;
+    });
+
+    const template = handlebars.compile(templateHtml);
+
+    // Preparar logo en base64
+    let logoBase64 = '';
+    try {
+      const logoPath = path.resolve('public/images/logo.png');
+      logoBase64 = fss.readFileSync(logoPath, 'base64');
+    } catch (e) {
+      console.warn('No se pudo cargar el logo:', e.message);
+    }
+
+    // Preparar datos para la plantilla
+    const data = {
+      titulo: `Reporte de Ventas ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`,
+      periodo: `Del ${moment(fechaInicio).format('LL')} al ${moment(fechaFin).format('LL')}`,
+      fechaGeneracion: moment().format('LLL'),
+      logoUrl: logoBase64 ? `data:image/png;base64,${logoBase64}` : null,
+      resumen: {
+        totalVentas: totalVentas.toFixed(2),
+        cantidadVentas,
+        promedioVenta: promedioVenta.toFixed(2)
+      },
+      ventas: ventasFormateadas,
+      tipoReporte: tipo
+    };
+
+    // Renderizar HTML
+    const html = template(data);
+    
+    // Configurar Puppeteer y generar PDF
+    const browser = await puppeteer.launch({ 
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.emulateMediaType('screen');
+    // Generar el PDF
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      displayHeaderFooter: false,
+      margin: { top: '20mm', bottom: '20mm'}
+    });
+
+    await browser.close();
+
+    // Enviar el PDF como respuesta
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=reporte_ventas_${tipo}.pdf`);
-    doc.pipe(res);
-    
-    // Encabezado del reporte
-    doc.fontSize(20).text(`Reporte de Ventas ${tipo}`, { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(`Del ${moment(fechaInicio).format('LL')} al ${moment(fechaFin).format('LL')}`, { align: 'center' });
-    doc.moveDown();
-    
-    // Resumen estadístico
-    const totalVentas = ventas.reduce((sum, venta) => sum + venta.total, 0);
-    const cantidadVentas = ventas.length;
-    
-    doc.fontSize(14).text('Resumen Estadístico:', { underline: true });
-    doc.text(`Total de ventas: ${cantidadVentas}`);
-    doc.text(`Monto total: $${totalVentas.toFixed(2)}`);
-    doc.moveDown();
-    
-    // Tabla de ventas
-    doc.fontSize(14).text('Detalle de Ventas:', { underline: true });
-    doc.moveDown();
-    
-    // Configurar columnas
-    const columnas = [
-      { header: 'Fecha', key: 'fecha', width: 100 },
-      { header: 'Cliente', key: 'cliente', width: 150 },
-      { header: 'Vendedor', key: 'vendedor', width: 150 },
-      { header: 'Total', key: 'total', width: 80 }
-    ];
-    
-    // Agregar datos a la tabla
-    ventas.forEach(venta => {
-      doc.text(moment(venta.fechaCreacion).format('LLL'), { continued: true })
-         .text(venta.cliente.nombre, { align: 'right', width: 150 })
-         .text(venta.vendedor != undefined ? venta.vendedor.nombre : '', { align: 'right', width: 150 })
-         .text(`$${venta.total.toFixed(2)}`, { align: 'right' });
-      doc.moveDown();
-    });
-    
-    doc.end();
+    res.send(pdfBuffer);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al generar el reporte' });
+    console.error('Error al generar el reporte:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error al generar el reporte de ventas',
+      error: error.message 
+    });
   }
 };
 
@@ -311,14 +351,16 @@ exports.generarReporteInventarioPDF = (tipo, filtros = {}) => async (req, res) =
     
     // 2. Compilar con Handlebars
     const template = handlebars.compile(templateHtml);
+
+    const logoPath = path.resolve('public/images/logo.png');
+    const logoBase64 = fss.readFileSync(logoPath, 'base64');
     
     // 3. Preparar datos para la plantilla
     const data = {
       titulo: `Reporte de Inventario ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`,
       fechaGeneracion: moment().format('LLL'),
       periodo: `Del ${moment(fechaInicio).format('LL')} al ${moment(fechaFin).format('LL')}`,
-      //logoUrl: 'file://' + require('path').resolve('public/images/logo.png'),
-      
+      logoUrl: `data:image/png;base64,${logoBase64}`,
       // Estadísticas
       resumen: {
         totalEntradas,
@@ -353,7 +395,7 @@ exports.generarReporteInventarioPDF = (tipo, filtros = {}) => async (req, res) =
     
     // 5. Configurar Puppeteer
     const browser = await puppeteer.launch({ 
-      headless: false,
+      headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox'] // Para entornos Linux
     });
     const page = await browser.newPage();
@@ -363,7 +405,7 @@ exports.generarReporteInventarioPDF = (tipo, filtros = {}) => async (req, res) =
     await page.emulateMediaType('screen');
     const pdfBuffer = await page.pdf({
       format: 'A4',
-      margin: { top: '30mm', right: '20mm', bottom: '30mm', left: '20mm' },
+      margin: { top: '20mm', bottom: '20mm'},
       printBackground: true,
       displayHeaderFooter: false // Lo manejamos en el HTML
     });
@@ -377,5 +419,394 @@ exports.generarReporteInventarioPDF = (tipo, filtros = {}) => async (req, res) =
   } catch (error) {
     console.error('Error al generar reporte de inventario:', error);
     res.status(500).json({ error: 'Error al generar el reporte', detalles: error.message });
+  }
+};
+
+exports.generarReciboCotizacionPDF = async (req, res) => {
+  try{
+    const { id } = req.params;
+
+    const cotizacion = await Cotizacion.findById(id)
+      .populate('cliente')
+      .populate('vendedor')
+      .exec();
+
+    if (!cotizacion) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cotizacion no encontrada'
+      });
+    }
+
+    if (!cotizacion.productos || cotizacion.productos.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'La cotización no contiene productos' 
+      });
+    }
+
+    const clienteInfo = {
+      nombre: cotizacion.cliente?.nombre || 'Cliente no especificado',
+      contacto: cotizacion.cliente?.contacto || 'Sin contacto',
+      direccion: cotizacion.cliente?.direccion || 'Sin dirección'
+    };
+
+    const vendedorInfo = {
+      nombre: cotizacion.vendedor?.nombre || 'Vendedor no especificado',
+      contacto: cotizacion.vendedor?.contacto || 'Sin contacto' //quitar
+    };
+
+    const formatMoney = (value) => {
+      if (typeof value !== 'number' || isNaN(value)) return '$0.00';
+      return `${value.toFixed(2)}`;
+    };
+
+    // 1. Calcular resumen de la cotización
+    const resumen = {
+      subTotal: cotizacion.subTotal || 0,
+      total: cotizacion.total || 0,
+      totalProductos: cotizacion.productos?.length || 0,
+      totalItems: cotizacion.productos?.reduce((sum, p) => sum + (p.cantidad || 0), 0) || 0,
+      descuentoGlobal: null
+    };
+
+    if (cotizacion.descuentoGlobal && 
+        cotizacion.descuentoGlobal.valor !== undefined && 
+        cotizacion.descuentoGlobal.valor !== null) {
+      
+      const descGlobal = cotizacion.descuentoGlobal;
+      const valor = parseFloat(descGlobal.valor) || 0;
+      
+      resumen.descuentoGlobal = {
+        razon: descGlobal.razon || 'Descuento aplicado',
+        valor: descGlobal.tipo === 'porcentaje' ? 
+          `${valor}%` : 
+          formatMoney(valor),
+        tipo: descGlobal.tipo
+      };
+    }
+
+    // 2. Procesar productos con validaciones
+    const productos = cotizacion.productos.map(p => {
+      // Precios con valores por defecto
+      const precioBase = parseFloat(p.precioBase) || 0;
+      const precio = parseFloat(p.precio) || precioBase;
+      const precioFinal = parseFloat(p.precioFinal) || (precio * (p.cantidad || 1));
+      
+      const producto = {
+        nombre: p.producto?.nombre || 'Producto no especificado',
+        descripcion: p.producto?.descripcion || '',
+        cantidad: p.cantidad || 1,
+        precioBase: formatMoney(precioBase),
+        precioUnitario: formatMoney(precio),
+        precioFinal: formatMoney(precioFinal),
+        variante: '',
+        extras: [],
+        descuento: null
+      };
+
+      // Manejo de variantes
+      if (p.variante) {
+        producto.variante = p.variante.nombreCompleto || 
+          [p.variante.tipo, p.color?.nombre, p.talla?.nombre]
+            .filter(Boolean).join(' / ');
+      }
+
+      // Manejo de extras
+      if (Array.isArray(p.extras)) {
+        producto.extras = p.extras.map(e => {
+          const extra = {
+            nombre: e.nombre || 'Extra no especificado',
+            precio: formatMoney(parseFloat(e.monto)) || 0,
+            cantidad: '1 pieza'
+          };
+
+          if (e.unidad === 'cm_cuadrado' && e.anchoCm && e.largoCm) {
+            const area = (parseFloat(e.anchoCm) || 0) * (parseFloat(e.largoCm) || 0);
+            extra.cantidad = `${e.anchoCm}cm × ${e.largoCm}cm`;
+          }
+
+          return extra;
+        });
+      }
+
+      // Manejo de descuentos por producto
+      if (p.descuento && p.descuento.valor !== undefined && p.descuento.valor !== null) {
+        const valor = parseFloat(p.descuento.valor) || 0;
+        producto.descuento = {
+          razon: p.descuento.razon || 'Descuento aplicado',
+          valor: p.descuento.tipo === 'porcentaje' ? 
+            `${valor}%` : 
+            formatMoney(valor),
+          precioAntesDescuento: p.descuento.tipo === 'porcentaje'
+            ? precio / (1 - (valor/100))
+            : precio + valor
+        };
+      }
+
+      return producto;
+    });
+
+    // 3. Cargar plantilla HTML
+    const templateHtml = await fs.readFile('app/templates/recibo-cotizacion.html', 'utf8');
+    const template = handlebars.compile(templateHtml);
+
+    // 4. Preparar logo en base64 (con manejo de errores)
+    let logoBase64 = '';
+    try {
+      const logoPath = path.resolve('public/images/logo.png');
+      logoBase64 = fss.readFileSync(logoPath, 'base64');
+    } catch (e) {
+      console.warn('No se pudo cargar el logo:', e.message);
+    }
+
+    // 5. Preparar datos para la plantilla
+    const data = {
+      titulo: `Cotización #${cotizacion._id.toString().substring(18, 24)}`,
+      fechaGeneracion: moment().format('LLL'),
+      fechaValidez: moment(cotizacion.expira).format('LL'),
+      logoUrl: logoBase64 ? `data:image/png;base64,${logoBase64}` : null,
+      cliente: clienteInfo,
+      vendedor: vendedorInfo,
+      resumen,
+      productos,
+      nota: "Esta cotización es válida hasta la fecha indicada. Los precios pueden variar según disponibilidad de materiales."
+    };
+
+    // 6. Renderizar HTML
+    const html = template(data);
+    
+    // 7. Configurar Puppeteer y generar PDF
+    const browser = await puppeteer.launch({ 
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+    
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.emulateMediaType('screen');
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      margin: { top: '20mm', bottom: '20mm'},
+      printBackground: true,
+      displayHeaderFooter: false
+    });
+    
+    await browser.close();
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=cotizacion_${cotizacion._id}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error al generar reporte de inventario:', error);
+    res.status(500).json({ error: 'Error al generar el reporte', detalles: error.message });
+  }
+};
+
+exports.generarReciboVentaPDF = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Obtener la venta con los datos poblados
+    const venta = await Venta.findById(id)
+      .populate('cliente')
+      .populate('vendedor')
+      .exec();
+
+    // Validar que la venta exista
+    if (!venta) {
+      return res.status(404).json({
+        success: false,
+        message: 'Venta no encontrada'
+      });
+    }
+
+    // Validar que tenga productos
+    if (!venta.productos || venta.productos.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'La venta no contiene productos' 
+      });
+    }
+
+    // Información del cliente con valores por defecto
+    const clienteInfo = {
+      nombre: venta.cliente?.nombre || 'Cliente no especificado',
+      contacto: venta.cliente?.contacto || 'Sin contacto',
+      direccion: venta.cliente?.direccion || 'Sin dirección'
+    };
+
+    // Información del vendedor con valores por defecto
+    const vendedorInfo = {
+      nombre: venta.vendedor?.nombre || 'Vendedor no especificado',
+      contacto: venta.vendedor?.contacto || 'Sin contacto'
+    };
+
+    // Función para formatear valores monetarios
+    const formatMoney = (value) => {
+      if (typeof value !== 'number' || isNaN(value)) return '0.00';
+      return value.toFixed(2);
+    };
+
+    // Calcular resumen de la venta
+    const resumen = {
+      subTotal: venta.subTotal || 0,
+      total: venta.total || 0,
+      restante: venta.restante || 0,
+      totalProductos: venta.productos?.length || 0,
+      totalItems: venta.productos?.reduce((sum, p) => sum + (p.cantidad || 0), 0) || 0,
+      descuentoGlobal: null,
+      pagos: [],
+      estado: venta.estado || 'pendiente'
+    };
+
+    // Manejo seguro del descuento global
+    if (venta.descuentoGlobal && 
+        venta.descuentoGlobal.valor !== undefined && 
+        venta.descuentoGlobal.valor !== null) {
+      
+      const descGlobal = venta.descuentoGlobal;
+      const valor = parseFloat(descGlobal.valor) || 0;
+      
+      resumen.descuentoGlobal = {
+        razon: descGlobal.razon || 'Descuento aplicado',
+        valor: descGlobal.tipo === 'porcentaje' ? 
+          `${valor}%` : 
+          formatMoney(valor),
+        tipo: descGlobal.tipo
+      };
+    }
+
+    // Procesar pagos si existen
+    if (venta.pagos && venta.pagos.length > 0) {
+      resumen.pagos = venta.pagos.map(pago => ({
+        metodo: pago.metodo.charAt(0).toUpperCase() + pago.metodo.slice(1),
+        monto: formatMoney(pago.monto),
+        fecha: moment(pago.fecha).format('DD/MM/YYYY'),
+        razon: pago.razon || 'Pago recibido'
+      }));
+    }
+
+    // Procesar productos con validaciones
+    const productos = venta.productos.map(p => {
+      // Precios con valores por defecto
+      const precioBase = parseFloat(p.precioBase) || 0;
+      const precio = parseFloat(p.precio) || precioBase;
+      const precioFinal = parseFloat(p.precioFinal) || (precio * (p.cantidad || 1));
+      
+      const producto = {
+        nombre: p.producto?.nombre || 'Producto no especificado',
+        descripcion: p.producto?.descripcion || '',
+        cantidad: p.cantidad || 1,
+        precioBase: formatMoney(precioBase),
+        precioUnitario: formatMoney(precio),
+        precioFinal: formatMoney(precioFinal),
+        variante: '',
+        extras: [],
+        descuento: null
+      };
+
+      // Manejo de variantes
+      if (p.variante) {
+        producto.variante = p.variante.nombreCompleto || 
+          [p.variante.tipo, p.color?.nombre, p.talla?.nombre]
+            .filter(Boolean).join(' / ');
+      }
+
+      // Manejo de extras
+      if (Array.isArray(p.extras)) {
+        producto.extras = p.extras.map(e => {
+          const extra = {
+            nombre: e.nombre || 'Extra no especificado',
+            precio: formatMoney(parseFloat(e.monto) || 0),
+            cantidad: '1 pieza'
+          };
+
+          if (e.unidad === 'cm_cuadrado' && e.anchoCm && e.largoCm) {
+            const area = (parseFloat(e.anchoCm) || 0) * (parseFloat(e.largoCm) || 0);
+            extra.cantidad = `${e.anchoCm}cm × ${e.largoCm}cm`;
+          }
+
+          return extra;
+        });
+      }
+
+      // Manejo de descuentos por producto
+      if (p.descuento && p.descuento.valor !== undefined && p.descuento.valor !== null) {
+        const valor = parseFloat(p.descuento.valor) || 0;
+        producto.descuento = {
+          razon: p.descuento.razon || 'Descuento aplicado',
+          valor: p.descuento.tipo === 'porcentaje' ? 
+            `${valor}%` : 
+            formatMoney(valor)
+        };
+      }
+
+      return producto;
+    });
+
+    // Cargar plantilla HTML
+    const templateHtml = await fs.readFile('app/templates/recibo-venta.html', 'utf8');
+    const template = handlebars.compile(templateHtml);
+
+    // Preparar logo en base64 (con manejo de errores)
+    let logoBase64 = '';
+    try {
+      const logoPath = path.resolve('public/images/logo.png');
+      logoBase64 = fss.readFileSync(logoPath, 'base64');
+    } catch (e) {
+      console.warn('No se pudo cargar el logo:', e.message);
+    }
+
+    // Preparar datos para la plantilla
+    const data = {
+      titulo: `Recibo de Venta #${venta._id.toString().substring(18, 24)}`,
+      folio: venta._id.toString().substring(18, 24),
+      fechaGeneracion: moment(venta.fechaCreacion).format('LLL'),
+      logoUrl: logoBase64 ? `data:image/png;base64,${logoBase64}` : null,
+      cliente: clienteInfo,
+      vendedor: vendedorInfo,
+      resumen,
+      productos,
+      estado: venta.estado.charAt(0).toUpperCase() + venta.estado.slice(1),
+      nota: "Gracias por su compra. Para aclaraciones, presentar este recibo.",
+      esLiquidado: venta.liquidado,
+      fechaLiquidacion: venta.fechaLiquidacion ? moment(venta.fechaLiquidacion).format('LLL') : null,
+      mostrarRestante: resumen.restante > 0
+    };
+
+    // Renderizar HTML
+    const html = template(data);
+    
+    // Configurar Puppeteer y generar PDF
+    const browser = await puppeteer.launch({ 
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+    
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.emulateMediaType('screen');
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      margin: { top: '20mm', bottom: '20mm'},
+      printBackground: true,
+      displayHeaderFooter: false
+    });
+    
+    await browser.close();
+    
+    // Enviar PDF como respuesta
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=recibo_venta_${venta._id}.pdf`);
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('Error al generar el PDF:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error al generar el PDF de la venta',
+      error: error.message 
+    });
   }
 };

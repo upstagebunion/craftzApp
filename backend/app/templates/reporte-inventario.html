@@ -6,18 +6,18 @@
   <style>
     /* Estilos base */
     body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; }
-    .page { padding: 20mm 15mm; }
+    .page { padding: 0 15mm; }
     
     /* Encabezado */
-    .header { display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 15px; }
-    .logo { width: 50px; height: auto; margin-right: 15px; }
+    .header { display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #292662; padding-bottom: 15px; }
+    .logo { width: 200px; height: auto; margin-right: 15px; }
     .header-text { flex: 1; }
-    .title { color: #0066cc; font-size: 22px; margin: 0 0 5px 0; }
+    .title { color: #292662; font-size: 22px; margin: 0 0 5px 0; }
     .subtitle { color: #666; font-size: 14px; margin: 0; }
     
     /* Resumen estadístico */
     .resumen-section { margin-bottom: 25px; }
-    .resumen-title { font-size: 16px; color: #0066cc; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; }
+    .resumen-title { font-size: 16px; color: #292662; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; }
     .resumen-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px; }
     .resumen-card { background: #f9f9f9; border-radius: 5px; padding: 10px; text-align: center; }
     .resumen-card h3 { margin: 0 0 5px 0; font-size: 14px; color: #666; }
@@ -31,7 +31,7 @@
     
     /* Tabla de movimientos */
     .movimientos-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    .movimientos-table th { background-color: #0066cc; color: white; padding: 10px; text-align: left; }
+    .movimientos-table th { background-color: #292662; color: white; padding: 10px; text-align: left; }
     .movimientos-table td { padding: 8px 10px; border-bottom: 1px solid #ddd; }
     .movimientos-table tr:nth-child(even) { background-color: #f9f9f9; }
     
@@ -48,7 +48,7 @@
     <!-- Encabezado -->
     <div class="header">
       {{#if logoUrl}}
-      <!-- <img src="{{logoUrl}}" class="logo" alt="Logo"> -->
+        <img src="{{logoUrl}}" class="logo" alt="Logo">
       {{/if}}
       <div class="header-text">
         <h1 class="title">{{titulo}}</h1>

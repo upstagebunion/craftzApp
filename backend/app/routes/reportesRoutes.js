@@ -6,7 +6,9 @@ const {
     getProductosCount,
     getVentasCountToday,
     getMonthlyRevenueLastMonth,
-    generarReporteInventarioPDF
+    generarReporteInventarioPDF,
+    generarReciboCotizacionPDF,
+    generarReciboVentaPDF
 } = require("../controllers/reportesController");
 const authMiddleware = require("../middleware/auth");
 
@@ -38,5 +40,8 @@ router.get('/conteo-clientes', authMiddleware, getClientesCount);
 router.get('/conteo-productos', authMiddleware, getProductosCount);
 router.get('/ventas-hoy', authMiddleware, getVentasCountToday);
 router.get('/ingresos-mes', authMiddleware, getMonthlyRevenueLastMonth);
+
+router.get('/recibo-cotizacion/:id', authMiddleware, generarReciboCotizacionPDF);
+router.get('/recibo-venta/:id', authMiddleware, generarReciboVentaPDF);
 
 module.exports = router;
