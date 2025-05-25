@@ -281,8 +281,6 @@ const agregarVariante = async (req, res) => {
       const producto = await Producto.findById(id)
         .populate('subcategoria')
         .exec();
-
-      productoInfo += producto.nombre;
   
       if (!producto) {
         return res.status(404).json({ message: "Producto no encontrado" });
@@ -290,7 +288,6 @@ const agregarVariante = async (req, res) => {
   
       // Buscar la variante en el producto
       const varianteExistente = producto.variantes.id(variante);
-      productoInfo += ', ' + varianteExistente.tipo;
   
       if (!varianteExistente) {
         return res.status(404).json({ message: "Variante no encontrada" });
@@ -316,7 +313,6 @@ const agregarVariante = async (req, res) => {
   
       // Agregar el color a la variante
       varianteExistente.colores.push(nuevoColor);
-      productoInfo += ', ' + color;
   
       // Guardar el producto actualizado
       await producto.save();

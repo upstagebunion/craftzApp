@@ -40,7 +40,11 @@ app.use("/api/parametrosCostos", parametrosCostosRoutes);
 app.use("/api/reportes", reportesRoutes);
 
 // Conexión a MongoDB
-mongoose.connect(config.mongoURI).then(() => console.log('MongoDB conectado'))
+mongoose.connect(config.mongoURI)
+  .then(() => {
+    console.log(`✅ MongoDB conectado en modo ${config.env.toUpperCase()}`);
+    console.log(`📂 Base de datos: ${mongoose.connection.name}`);
+  })
   .catch(err => console.log(err));
 
 app.get('/', (req, res) => res.send('API funcionando'));
