@@ -6,7 +6,15 @@
   <style>
     /* Estilos base */
     body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; color: #333; }
-    .page { padding: 0 15mm; }
+    @page {
+      size: A4;
+      margin: 15mm 15mm;
+      @bottom-center {
+        content: "Página " counter(page) " de " counter(pages) " | Craftz Admin App.";
+        font-size: 10pt;
+        color: #666;
+      }
+    }
     
     /* Encabezado */
     .header { display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #292662; padding-bottom: 15px; }
@@ -108,26 +116,6 @@
         {{/each}}
       </tbody>
     </table>
-    
-    <!-- Pie de página -->
-    <div class="footer">
-      Página <span class="pageNumber"></span> de <span class="totalPages"></span> • Sistema de Inventario
-    </div>
   </div>
-
-  <!-- Script para numeración de páginas (Puppeteer lo ejecutará) -->
-  <script>
-    // Numeración de páginas
-    document.addEventListener('DOMContentLoaded', function() {
-      const totalPages = Math.ceil(document.body.scrollHeight / window.innerHeight);
-      document.querySelector('.totalPages').textContent = totalPages;
-      
-      // Esta parte se completa cuando Puppeteer procesa cada página
-      const pageNumbers = document.querySelectorAll('.pageNumber');
-      for (let i = 0; i < pageNumbers.length; i++) {
-        pageNumbers[i].textContent = i + 1;
-      }
-    });
-  </script>
 </body>
 </html>

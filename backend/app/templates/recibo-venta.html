@@ -12,8 +12,14 @@
       color: #333; 
       font-size: 14px;
     }
-    .page { 
-      padding: 0 15mm; 
+    @page {
+      size: A4;
+      margin: 15mm 15mm;
+      @bottom-center {
+        content: "Página " counter(page) " de " counter(pages) " | Gracias por su preferencia.";
+        font-size: 10pt;
+        color: #666;
+      }
     }
     
     /* Encabezado */
@@ -219,7 +225,6 @@
       </div>
       <div class="header-info">
         <h1 class="title">{{titulo}}</h1>
-        <p class="subtitle">Folio: <span class="folio">{{folio}}</span></p>
         <p class="subtitle">Fecha: {{fechaGeneracion}}</p>
       </div>
     </div>
@@ -356,24 +361,6 @@
     <div class="notas">
       <p>{{nota}}</p>
     </div>
-    
-    <!-- Pie de página -->
-    <div class="footer">
-      Página <span class="pageNumber"></span> de <span class="totalPages"></span> • Gracias por su preferencia
-    </div>
   </div>
-
-  <!-- Script para numeración de páginas -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const totalPages = Math.ceil(document.body.scrollHeight / window.innerHeight);
-      document.querySelector('.totalPages').textContent = totalPages;
-      
-      const pageNumbers = document.querySelectorAll('.pageNumber');
-      for (let i = 0; i < pageNumbers.length; i++) {
-        pageNumbers[i].textContent = i + 1;
-      }
-    });
-  </script>
 </body>
 </html>

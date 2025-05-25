@@ -6,8 +6,6 @@ const Producto = require('../models/productosModel');
 const Cotizacion = require('../models/cotizacionModel');
 const Cliente = require('../models/clienteModel');
 const MovimientoInventario = require('../models/movimientosInventarioModel');
-const { getLaunchOptions } = require('../../chromium-config');
-const puppeteer = require('puppeteer');
 const handlebars = require('handlebars');
 const fs = require('fs').promises;
 const fss = require('fs');
@@ -15,7 +13,6 @@ const path = require('path');
 
 exports.generarReporteVentasPDF = (tipo) => async (req, res) => {
   try {
-    const launchOptions = await getLaunchOptions();
     // Configurar fechas según el tipo de reporte
     let fechaInicio, fechaFin;
     const hoy = new Date();
@@ -89,26 +86,9 @@ exports.generarReporteVentasPDF = (tipo) => async (req, res) => {
     // Renderizar HTML
     const html = template(data);
     
-    // Configurar Puppeteer y generar PDF
-    const browser = await puppeteer.launch(launchOptions);
-    const page = await browser.newPage();
-
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    await page.emulateMediaType('screen');
-    // Generar el PDF
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      displayHeaderFooter: false,
-      margin: { top: '20mm', bottom: '20mm'}
-    });
-
-    await browser.close();
-
-    // Enviar el PDF como respuesta
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=reporte_ventas_${tipo}.pdf`);
-    res.send(pdfBuffer);
+    // Enviar el HTML como respuesta
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
   } catch (error) {
     console.error('Error al generar el reporte:', error);
     res.status(500).json({ 
@@ -292,7 +272,6 @@ exports.getVentasStatsByDateRange = async (req, res) => {
 
 exports.generarReporteInventarioPDF = (tipo, filtros = {}) => async (req, res) => {
   try {
-    const launchOptions = await getLaunchOptions();
     // Configurar fechas según el tipo de reporte
     let fechaInicio, fechaFin;
     const hoy = new Date();
@@ -392,26 +371,9 @@ exports.generarReporteInventarioPDF = (tipo, filtros = {}) => async (req, res) =
     // 4. Renderizar HTML
     const html = template(data);
     
-    // 5. Configurar Puppeteer
-    const browser = await puppeteer.launch(launchOptions);
-    const page = await browser.newPage();
-    
-    // 6. Configurar contenido y generar PDF
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    await page.emulateMediaType('screen');
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      margin: { top: '20mm', bottom: '20mm'},
-      printBackground: true,
-      displayHeaderFooter: false // Lo manejamos en el HTML
-    });
-    
-    await browser.close();
-    
-    // 7. Enviar PDF
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=reporte_inventario_${tipo}.pdf`);
-    res.send(pdfBuffer);
+    // Enviar el HTML como respuesta
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
   } catch (error) {
     console.error('Error al generar reporte de inventario:', error);
     res.status(500).json({ error: 'Error al generar el reporte', detalles: error.message });
@@ -572,24 +534,9 @@ exports.generarReciboCotizacionPDF = async (req, res) => {
     // 6. Renderizar HTML
     const html = template(data);
     
-    // 7. Configurar Puppeteer y generar PDF
-    const browser = await puppeteer.launch(launchOptions);
-    const page = await browser.newPage();
-    
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    await page.emulateMediaType('screen');
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      margin: { top: '20mm', bottom: '20mm'},
-      printBackground: true,
-      displayHeaderFooter: false
-    });
-    
-    await browser.close();
-    
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename=cotizacion_${cotizacion._id}.pdf`);
-    res.send(pdfBuffer);
+    // Enviar el HTML como respuesta
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
   } catch (error) {
     console.error('Error al generar reporte de inventario:', error);
     res.status(500).json({ error: 'Error al generar el reporte', detalles: error.message });
@@ -598,7 +545,6 @@ exports.generarReciboCotizacionPDF = async (req, res) => {
 
 exports.generarReciboVentaPDF = async (req, res) => {
   try {
-    const launchOptions = await getLaunchOptions();
     const { id } = req.params;
 
     // Obtener la venta con los datos poblados
@@ -772,26 +718,9 @@ exports.generarReciboVentaPDF = async (req, res) => {
     // Renderizar HTML
     const html = template(data);
     
-    // Configurar Puppeteer y generar PDF
-    const browser = await puppeteer.launch(launchOptions);
-    const page = await browser.newPage();
-    
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    await page.emulateMediaType('screen');
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      margin: { top: '20mm', bottom: '20mm'},
-      printBackground: true,
-      displayHeaderFooter: false
-    });
-    
-    await browser.close();
-    
-    // Enviar PDF como respuesta
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename=recibo_venta_${venta._id}.pdf`);
-    res.send(pdfBuffer);
-
+    // Enviar el HTML como respuesta
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
   } catch (error) {
     console.error('Error al generar el PDF:', error);
     res.status(500).json({ 

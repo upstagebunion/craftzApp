@@ -140,7 +140,7 @@ exports.obtenerCostoElaboracion = async (req, res) => {
 
 exports.actualizarCostoElaboracion = async (req, res) => {
   try {
-    const { nombre, descripcion, unidad, costo, anchoPlancha, largoPlancha, subcategoriasAplica } = req.body;
+    const { nombre, descripcion, unidad, monto, anchoPlancha, largoPlancha, subcategoriasAplica } = req.body;
 
     // Validar que el costo exista
     const costoExistente = await CostoElaboracion.findById(req.params.id);
@@ -167,7 +167,7 @@ exports.actualizarCostoElaboracion = async (req, res) => {
       nombre: nombre || costoExistente.nombre,
       descripcion: descripcion !== undefined ? descripcion : costoExistente.descripcion,
       unidad: unidad || costoExistente.unidad,
-      costo: costo !== undefined ? costo : costoExistente.costo,
+      monto: monto !== undefined ? monto : costoExistente.monto,
       subcategoriasAplica: subcategoriasAplica || costoExistente.subcategoriasAplica
     };
 

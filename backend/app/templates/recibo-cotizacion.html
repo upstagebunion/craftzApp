@@ -12,8 +12,21 @@
       color: #333; 
       font-size: 14px;
     }
-    .page { 
-      padding: 0 15mm; 
+    @page {
+      size: A4;
+      margin: 15mm 15mm;
+      @bottom-center {
+        content: "Página " counter(page) " de " counter(pages) " | Gracias por su preferencia.";
+        font-size: 10pt;
+        color: #666;
+      }
+    }
+
+    .salto-pagina {
+      page-break-after: always;
+    }
+    .no-dividir {
+      page-break-inside: avoid;
     }
     
     /* Encabezado */
@@ -265,7 +278,7 @@
     </table>
     
     <!-- Resumen total -->
-    <div class="resumen-total">
+    <div class="resumen-total no-dividir">
       <div class="total-grid">
         <div class="total-item">
           <span class="total-label">Subtotal:</span>
@@ -292,24 +305,6 @@
     <div class="notas">
       <p>{{nota}}</p>
     </div>
-    
-    <!-- Pie de página -->
-    <div class="footer">
-      Página <span class="pageNumber"></span> de <span class="totalPages"></span> • Gracias por su preferencia
-    </div>
   </div>
-
-  <!-- Script para numeración de páginas -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const totalPages = Math.ceil(document.body.scrollHeight / window.innerHeight);
-      document.querySelector('.totalPages').textContent = totalPages;
-      
-      const pageNumbers = document.querySelectorAll('.pageNumber');
-      for (let i = 0; i < pageNumbers.length; i++) {
-        pageNumbers[i].textContent = i + 1;
-      }
-    });
-  </script>
 </body>
 </html>
