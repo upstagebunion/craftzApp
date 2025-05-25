@@ -311,6 +311,7 @@ exports.actualizarEstadoVenta = async (req, res) => {
               // Producto sin talla pero con color
               if (color.stock < item.cantidad) {
                 await session.abortTransaction();
+                await session.endSession();
                 return res.status(400).json({
                   message: `Stock insuficiente para el producto ${producto.nombre} (color ${item.color.nombre})`
                 });
