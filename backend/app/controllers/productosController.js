@@ -301,14 +301,8 @@ const agregarVariante = async (req, res) => {
       };
 
       if (!producto.subcategoria.usaTallas) {
-        if (stock && stock > 0 && costo) {
-            nuevoColor.stock = stock;
-            nuevoColor.costo = costo;
-        } else {
-            return res.status(400).json({ 
-                message: "Debe proporcionar un stock válido (mayor a 0)" 
-            });
-        }
+        nuevoColor.stock = stock;
+        nuevoColor.costo = costo;
       }
   
       // Agregar el color a la variante
@@ -317,17 +311,17 @@ const agregarVariante = async (req, res) => {
       // Guardar el producto actualizado
       await producto.save();
 
-      let productoInfo = producto.nombre + ' | ' + varianteExistente.tipo + ' | ' + color;
       if (!producto.subcategoria.usaTallas && stock > 0) {
-          await registrarMovimiento(
-              producto._id,
-              varianteExistente._id,
-              nuevoColor._id,
-              null, // No hay talla
-              stock,
-              usuario,
-              productoInfo
-          );
+        let productoInfo = producto.nombre + ' | ' + varianteExistente.tipo + ' | ' + color;
+        await registrarMovimiento(
+            producto._id,
+            varianteExistente._id,
+            nuevoColor._id,
+            null, // No hay talla
+            stock,
+            usuario,
+            productoInfo
+        );
       }
 
       const productoRespuesta = await Producto.findById(id);
@@ -388,17 +382,19 @@ const agregarVariante = async (req, res) => {
   
       // Guardar el producto actualizado
       await producto.save();
-
-      let productoInfo = producto.nombre + ' | ' + varianteExistente.tipo + ' | ' + colorExistente.color + ' | ' + talla;
-      await registrarMovimiento(
-        producto._id,
-        varianteExistente._id,
-        colorExistente._id,
-        nuevaTalla._id,
-        stock,
-        usuario,
-        productoInfo,
-      );
+      
+      if (producto.subcategoria.usaTallas && stock > 0) {
+        let productoInfo = producto.nombre + ' | ' + varianteExistente.tipo + ' | ' + colorExistente.color + ' | ' + talla;
+        await registrarMovimiento(
+          producto._id,
+          varianteExistente._id,
+          colorExistente._id,
+          nuevaTalla._id,
+          stock,
+          usuario,
+          productoInfo,
+        );
+      }
 
       const productoRespuesta = await Producto.findById(id);
   
