@@ -272,7 +272,7 @@
       </thead>
       <tbody>
         {{#each productos}}
-        <tr>
+        <tr class="no-dividir">
           <td class="text-center">{{cantidad}}</td>
           <td>
             <div class="text-bold">{{nombre}}</div>
@@ -286,7 +286,7 @@
               <ul class="extras-list">
                 {{#each extras}}
                 <li class="extra-item">
-                  + {{nombre}}: {{cantidad}} (${{precio}})
+                  + {{nombre}}: {{cantidad}}
                 </li>
                 {{/each}}
               </ul>
@@ -301,7 +301,7 @@
     </table>
     
     <!-- Resumen total -->
-    <div class="resumen-total">
+    <div class="resumen-total no-dividir">
       <div class="total-grid">
         <div class="total-item">
           <span class="total-label">Subtotal:</span>
@@ -309,7 +309,7 @@
         </div>
         <div class="total-item">
           <span class="total-label">Productos:</span>
-          <span class="total-value">{{resumen.totalProductos}}</span>
+          <span class="total-value">{{resumen.totalItems}}</span>
         </div>
         {{#if resumen.descuentoGlobal}}
         <div class="total-item">
