@@ -149,6 +149,6 @@ router.get('/', authMiddleware, obtenerProductos);
 Developed by Francisco García Solís — built to scale.
 
 ## 📎 Related Repos
-- Frontend - CraftzApp (React, WIP)
+- Frontend - CraftzApp (Flutter, Dart)
 
 > "A backend built for flexibility, precision, and power — tailored for real-world e-commerce." 💼🧵
