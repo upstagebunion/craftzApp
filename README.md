@@ -1,18 +1,3 @@
-upstagebunion
-fbXpIPy2AO8avOdR
-
-ip 187.189.208.177
-
-npm install mongoose
-
-mongodb+srv://upstagebunion:fbXpIPy2AO8avOdR@craftz.nbilm.mongodb.net/?retryWrites=true&w=majority&appName=craftz
-
-{
-    "correo": "usuario3@example.com",
-    "password": "123456"
-}
-
-
 <p align="center">
   <img src="https://img.shields.io/badge/Node.js-18.x-green?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Express.js-Backend-blue?style=for-the-badge"/>
