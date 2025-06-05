@@ -14,7 +14,7 @@ exports.crearCliente = async (req, res) => {
       apellido_paterno,
       apellido_materno,
       alias,
-      correo,
+      correo: correo || undefined,
       telefono,
       // fecha_registro se añade automáticamente por el default
     });

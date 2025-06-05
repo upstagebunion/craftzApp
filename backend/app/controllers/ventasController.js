@@ -135,14 +135,94 @@ exports.liquidarVenta = async (req, res) => {
 
 exports.obtenerVentas = async (req, res) => {
   try {
-    const ventas = await Venta.find()
+    const { fecha_inicio, fecha_fin } = req.query;
+    
+    // Si hay parámetros de fecha, hacer búsqueda por rango
+    if (fecha_inicio && fecha_fin) {
+      const startDate = new Date(fecha_inicio);
+      const endDate = new Date(fecha_fin);
+      endDate.setHours(23, 59, 59, 999);
+      
+      const ventas = await Venta.find({
+        fechaCreacion: {
+          $gte: startDate,
+          $lte: endDate
+        }
+      })
       .populate('cliente')
-      .populate('vendedor', 'nombre');
+      .populate('vendedor', 'nombre')
+      .sort({ fechaCreacion: -1 });
+      
+      return res.status(200).json(ventas);
+    }
+
+    // Primero obtenemos las ventas no finalizadas (sin límite)
+    const ventasNoFinalizadas = await Venta.find({
+      $or: [
+        { estado: { $in: ['pendiente', 'confirmado', 'preparado'] } },
+        { 
+          $and: [
+            { estado: { $in: ['entregado', 'devuelto'] } },
+            { liquidado: false }
+          ]
+        }
+      ]
+    })
+    .populate('cliente')
+    .populate('vendedor', 'nombre')
+    .sort({ fechaCreacion: -1 }); // Ordenamos por fecha más reciente primero
+
+    // Luego obtenemos las últimas 10 ventas finalizadas (entregadas/devueltas y liquidadas)
+    const ventasFinalizadas = await Venta.find({
+      estado: { $in: ['entregado', 'devuelto'] },
+      liquidado: true
+    })
+    .populate('cliente')
+    .populate('vendedor', 'nombre')
+    .sort({ fechaCreacion: -1 }) // Ordenamos por fecha más reciente primero
+    .limit(10); // Limitamos a 10 resultados
+
+    // Combinamos los resultados (primero las no finalizadas, luego las finalizadas)
+    const ventasCombinadas = [...ventasNoFinalizadas, ...ventasFinalizadas];
+
+    res.status(200).json(ventasCombinadas);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: 'Error al obtener las ventas', error: error.message });
+  }
+};
+
+exports.obtenerVentasPorFecha = async (req, res) => {
+  try {
+    const { fecha_inicio, fecha_fin } = req.query;
+    
+    // Validar que vengan ambos parámetros
+    if (!fecha_inicio || !fecha_fin) {
+      return res.status(400).json({ msg: 'Debes proporcionar fecha_inicio y fecha_fin' });
+    }
+    
+    // Convertir a objetos Date (asumiendo formato YYYY-MM-DD)
+    const startDate = new Date(fecha_inicio);
+    const endDate = new Date(fecha_fin);
+    
+    // Ajustar endDate para incluir todo el día final
+    endDate.setHours(23, 59, 59, 999);
+    
+    // Consulta a la base de datos
+    const ventas = await Venta.find({
+      fechaCreacion: {
+        $gte: startDate,
+        $lte: endDate
+      }
+    })
+    .populate('cliente')
+    .populate('vendedor', 'nombre')
+    .sort({ fechaCreacion: -1 }); // Ordenar por fecha más reciente primero
     
     res.status(200).json(ventas);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ msg: 'Error al obtener las ventas', error: error.message });
+    res.status(500).json({ msg: 'Error al obtener ventas por fecha', error: error.message });
   }
 };
 

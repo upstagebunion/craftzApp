@@ -30,7 +30,8 @@ exports.generarReporteVentasPDF = (tipo) => async (req, res) => {
     
     // Consultar ventas en el rango de fechas
     const ventas = await Venta.find({
-      fechaCreacion: { $gte: fechaInicio, $lte: fechaFin }
+      fechaCreacion: { $gte: fechaInicio, $lte: fechaFin },
+      estado: { $ne: 'devuelto' }
     }).populate('cliente vendedor').sort({ fechaCreacion: 1 });
     
     // Calcular estadísticas
@@ -111,7 +112,8 @@ exports.getVentasCountToday = async (req, res) => {
       fechaCreacion: {
         $gte: startOfDay,
         $lte: endOfDay
-      }
+      },
+      estado: { $ne: 'devuelto' }
     });
 
     res.status(200).json({
@@ -185,7 +187,8 @@ exports.getMonthlyRevenueLastMonth = async (req, res) => {
           fechaCreacion: {
             $gte: oneMonthAgo,
             $lt: now // Usamos $lt para incluir todas las ventas hasta el final del mes anterior
-          }
+          },
+          estado: { $ne: 'devuelto' }
         }
       },
       {
