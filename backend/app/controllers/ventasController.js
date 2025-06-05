@@ -357,29 +357,24 @@ exports.actualizarEstadoVenta = async (req, res) => {
       return res.status(404).json({ message: 'Venta no encontrada' });
     }
 
-    let infoProducto = '';
-
     // 1. Manejo para cuando se marca como ENTREGADO
     if (estado === 'entregado') {
       for (const item of venta.productos) {
         if (!item.productoRef) continue; // Saltar items temporales
+        let infoProducto = '';
         
         const producto = await Producto.findById(item.productoRef).session(session);
         if (!producto) continue;
-        infoProducto += producto.nombre;
 
         // Actualizar stock
         if (item.variante?.id) {
           const variante = producto.variantes.id(item.variante.id);
-          infoProducto += ' | ' + variante.tipo;
           if (item.color?.id) {
             const color = variante.colores.id(item.color.id);
-            infoProducto += ' | ' + color.color;
             
             if (item.talla?.id) {
               // Producto con talla
               const talla = color.tallas.id(item.talla.id);
-              infoProducto += ' | ' + talla.talla;
               if (talla.stock < item.cantidad) {
                 await session.abortTransaction();
                 return res.status(400).json({
@@ -387,6 +382,7 @@ exports.actualizarEstadoVenta = async (req, res) => {
                 });
               }
               talla.stock -= item.cantidad;
+              infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + color.color + ' | ' + talla.talla;
             } else {
               // Producto sin talla pero con color
               if (color.stock < item.cantidad) {
@@ -397,10 +393,10 @@ exports.actualizarEstadoVenta = async (req, res) => {
                 });
               }
               color.stock -= item.cantidad;
+              infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + color.color;
             }
           } 
         }
-
         await producto.save();
 
         // Registrar movimiento de inventario
@@ -441,6 +437,7 @@ exports.actualizarEstadoVenta = async (req, res) => {
         // Si no hay movimientos previos, crear nuevos como pérdida
         for (const item of venta.productos) {
           if (!item.productoRef) continue;
+          let infoProducto = '';
 
           const producto = await Producto.findById(item.productoRef).session(session);
           if (!producto) continue;
