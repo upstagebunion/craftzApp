@@ -42,6 +42,7 @@ app.use("/api/reportes", reportesRoutes);
 // Conexión a MongoDB
 mongoose.connect(config.mongoURI)
   .then(() => {
+    console.log(`Backend de desarrollo de integracion con tienda en linea PRECAUCION!!!! ${config.env.toUpperCase()}`);
     console.log(`✅ MongoDB conectado en modo ${config.env.toUpperCase()}`);
     console.log(`📂 Base de datos: ${mongoose.connection.name}`);
   })
