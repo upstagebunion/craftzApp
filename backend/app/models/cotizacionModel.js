@@ -33,13 +33,20 @@ const CotizacionSchema = new mongoose.Schema({
       // Para elementos temporales:
       nombreCompleto: { type: String } // Ej: "Playera blanca manga larga"
     },
+    calidad: {
+      id: { type: mongoose.Schema.Types.ObjectId, required: false },
+      // Para elementos temporales:
+      calidad: { type: String, trim: true } // Ej: "Premium/estandar"
+    },
     color: {
       id: { type: mongoose.Schema.Types.ObjectId, required: false },
-      nombre: { type: String, trim: true }
+      nombre: { type: String, trim: true },
+      codigoHex: { type:String, trim: true }
     },
     talla: {
       id: { type: mongoose.Schema.Types.ObjectId, required: false },
-      nombre: { type: String, trim: true }
+      nombre: { type: String, trim: true },
+      codigo: { type: String, trim:true }
     },
     
     // Extras (unificados para registrados y temporales)

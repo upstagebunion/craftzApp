@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const productosRouter = require('./app/routes/productosRoutes');
+const productosOnlineRouter = require('./app/routes/productosOnlineRoutes');
 const authRouter = require('./app/routes/authRoutes');
 const userRoutes = require('./app/routes/userRoutes');
 const ventasRoutes = require("./app/routes/ventasRoutes");
@@ -29,6 +30,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use('/api/productos', productosRouter);
+app.use('/api/productosOnline', productosOnlineRouter);
 app.use('/users', userRoutes);
 app.use('/auth', authRouter);
 app.use("/api/ventas", ventasRoutes)

@@ -31,13 +31,20 @@ const VentaSchema = new mongoose.Schema({
       tipo: { type: String },
       nombreCompleto: { type: String }
     },
+    calidad: {
+      id: { type: mongoose.Schema.Types.ObjectId, required: false },
+      // Para elementos temporales:
+      calidad: { type: String, trim: true } // Ej: "Premium/estandar"
+    },
     color: {
       id: { type: mongoose.Schema.Types.ObjectId, required: false },
-      nombre: { type: String }
+      nombre: { type: String },
+      codigoHex: { type:String, trim: true }
     },
     talla: {
       id: { type: mongoose.Schema.Types.ObjectId, required: false },
-      nombre: { type: String }
+      nombre: { type: String },
+      codigo: { type: String, trim:true }
     },
     
     // Extras (unificados para registrados y temporales)

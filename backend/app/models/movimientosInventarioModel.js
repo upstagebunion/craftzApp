@@ -13,6 +13,11 @@ const MovimientoInventarioSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  calidad: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    index: true
+  },
   color: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,

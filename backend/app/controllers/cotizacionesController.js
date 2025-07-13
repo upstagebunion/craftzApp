@@ -4,7 +4,7 @@ const Cotizacion = require('../models/cotizacionModel');
 const Usuario = require('../models/usuariosModel');
 const Venta = require('../models/ventasModel');
 const Cliente = require('../models/clienteModel');
-const Producto = require('../models/productosModel');
+const Producto = require('../models/productsRelatedModels/productosModel');
 const Extra = require('../models/extrasModel');
 
 const validarReferencias = async (cotizacionData) => {
