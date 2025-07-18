@@ -408,13 +408,12 @@ exports.generarReciboCotizacionPDF = async (req, res) => {
 
     const clienteInfo = {
       nombre: cotizacion.cliente?.nombre || 'Cliente no especificado',
-      contacto: cotizacion.cliente?.contacto || 'Sin contacto',
+      contacto: cotizacion.cliente?.telefono || 'Sin contacto',
       direccion: cotizacion.cliente?.direccion || 'Sin dirección'
     };
 
     const vendedorInfo = {
-      nombre: cotizacion.vendedor?.nombre || 'Vendedor no especificado',
-      contacto: cotizacion.vendedor?.contacto || 'Sin contacto' //quitar
+      nombre: cotizacion.vendedor?.nombre || 'Vendedor no especificado'
     };
 
     const formatMoney = (value) => {
@@ -469,7 +468,7 @@ exports.generarReciboCotizacionPDF = async (req, res) => {
       // Manejo de variantes
       if (p.variante) {
         producto.variante = p.variante.nombreCompleto || 
-          [p.variante.tipo, p.color?.nombre, p.talla?.nombre]
+          [p.variante.tipo, p.calidad?.calidad, p.color?.nombre, p.talla?.nombre]
             .filter(Boolean).join(' / ');
       }
 
@@ -575,14 +574,13 @@ exports.generarReciboVentaPDF = async (req, res) => {
     // Información del cliente con valores por defecto
     const clienteInfo = {
       nombre: venta.cliente?.nombre || 'Cliente no especificado',
-      contacto: venta.cliente?.contacto || 'Sin contacto',
+      contacto: venta.cliente?.telefono || 'Sin contacto',
       direccion: venta.cliente?.direccion || 'Sin dirección'
     };
 
     // Información del vendedor con valores por defecto
     const vendedorInfo = {
-      nombre: venta.vendedor?.nombre || 'Vendedor no especificado',
-      contacto: venta.vendedor?.contacto || 'Sin contacto'
+      nombre: venta.vendedor?.nombre || 'Vendedor no especificado'
     };
 
     // Función para formatear valores monetarios
@@ -652,7 +650,7 @@ exports.generarReciboVentaPDF = async (req, res) => {
       // Manejo de variantes
       if (p.variante) {
         producto.variante = p.variante.nombreCompleto || 
-          [p.variante.tipo, p.color?.nombre, p.talla?.nombre]
+          [p.variante.tipo, p.calidad?.calidad, p.color?.nombre, p.talla?.nombre]
             .filter(Boolean).join(' / ');
       }
 

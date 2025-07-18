@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Venta = require("../models/ventasModel");
+const Cliente = require('../models/clienteModel');
 const Producto = require("../models/productsRelatedModels/productosModel");
 const Extra = require("../models/extrasModel");
 const Cotizacion = require("../models/cotizacionModel");
@@ -80,15 +81,21 @@ exports.crearVenta = async (req, res) => {
         },
         variante: {
           id: variante._id,
-          tipo: variante.tipo,
+          tipo: variante.tipo ?? '',
+        },
+        calidad: {
+          id: calidad._id,
+          tipo: calidad.calidad ?? '',
         },
         color: {
           id: color._id,
-          nombre: color.color
+          nombre: color.color ?? '',
+          codigoHex: color.codigoHex ?? '#FFFFFF'
         },
         talla: talla ? {
           id: talla._id,
-          nombre: talla.talla
+          nombre: talla.talla,
+          codigo: talla.codigo
         } : null,
         extras: extrasInfo,
         precio: item.precio,
@@ -262,7 +269,7 @@ exports.agregarPago = async (req, res) => {
     }
 
     // Validar datos del pago
-    if (!razon || !monto || !metodo) {
+    if (!monto || !metodo) {
       return res.status(400).json({ message: 'Faltan campos requeridos: razon, monto, metodo' });
     }
 
@@ -377,33 +384,36 @@ exports.actualizarEstadoVenta = async (req, res) => {
         // Actualizar stock
         if (item.variante?.id) {
           const variante = producto.variantes.id(item.variante.id);
-          if (item.color?.id) {
-            const color = variante.colores.id(item.color.id);
-            
-            if (item.talla?.id) {
-              // Producto con talla
-              const talla = color.tallas.id(item.talla.id);
-              if (talla.stock < item.cantidad) {
-                await session.abortTransaction();
-                return res.status(400).json({
-                  message: `Stock insuficiente para el producto ${producto.nombre} (talla ${item.talla.nombre})`
-                });
+          if (item.calidad?.id){
+            const calidad = variante.calidades.id(item.calidad.id);
+            if (item.color?.id) {
+              const color = calidad.colores.id(item.color.id);
+              
+              if (item.talla?.id) {
+                // Producto con talla
+                const talla = color.tallas.id(item.talla.id);
+                if (talla.stock < item.cantidad) {
+                  await session.abortTransaction();
+                  return res.status(400).json({
+                    message: `Stock insuficiente para el producto ${producto.nombre} (talla ${item.talla.nombre})`
+                  });
+                }
+                talla.stock -= item.cantidad;
+                infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + calidad.calidad + ' | ' + color.color + ' | ' + talla.talla;
+              } else {
+                // Producto sin talla pero con color
+                if (color.stock < item.cantidad) {
+                  await session.abortTransaction();
+                  await session.endSession();
+                  return res.status(400).json({
+                    message: `Stock insuficiente para el producto ${producto.nombre} (color ${item.color.nombre})`
+                  });
+                }
+                color.stock -= item.cantidad;
+                infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + calidad.calidad + ' | ' + color.color;
               }
-              talla.stock -= item.cantidad;
-              infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + color.color + ' | ' + talla.talla;
-            } else {
-              // Producto sin talla pero con color
-              if (color.stock < item.cantidad) {
-                await session.abortTransaction();
-                await session.endSession();
-                return res.status(400).json({
-                  message: `Stock insuficiente para el producto ${producto.nombre} (color ${item.color.nombre})`
-                });
-              }
-              color.stock -= item.cantidad;
-              infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + color.color;
-            }
-          } 
+            } 
+          }
         }
         await producto.save();
 
@@ -426,6 +436,12 @@ exports.actualizarEstadoVenta = async (req, res) => {
           comentarios: `Venta #${venta._id}`
         });
         await movimiento.save({ session });
+      }
+
+      const cliente = await Cliente.findById(venta.cliente).session(session);
+      if (cliente) {
+        cliente.compras = cliente.compras + 1;
+        await cliente.save();
       }
     } else if (estado === 'devuelto') { // 2. Manejo para cuando se marca como DEVUELTO
       // Buscar movimientos de inventario relacionados a esta venta
@@ -469,7 +485,7 @@ exports.actualizarEstadoVenta = async (req, res) => {
                       });
                     }
                     talla.stock -= item.cantidad;
-                    infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + color.color + ' | ' + talla.talla;
+                    infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + calidad.calidad + ' | ' + color.color + ' | ' + talla.talla;
                   } else {
                     // Producto sin talla pero con color
                     if (color.stock < item.cantidad) {
@@ -479,7 +495,7 @@ exports.actualizarEstadoVenta = async (req, res) => {
                       });
                     }
                     color.stock -= item.cantidad;
-                    infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + color.color;
+                    infoProducto = producto.nombre + ' | ' + variante.tipo + ' | ' + calidad.calidad + ' | ' + color.color;
                   }
                 } 
             }
@@ -505,6 +521,12 @@ exports.actualizarEstadoVenta = async (req, res) => {
           });
           await movimiento.save({ session });
         }
+      }
+
+      const cliente = await Cliente.findById(venta.cliente).session(session);
+      if (cliente) {
+        cliente.compras = cliente.compras - 1;
+        await cliente.save();
       }
     } else {
       const movimientos = await MovimientoInventario.find({
@@ -532,7 +554,7 @@ exports.actualizarEstadoVenta = async (req, res) => {
           const color = calidad.colores.id(movimiento.color);
           color.stock += movimiento.cantidad;
         } else {
-          // Producto sin variantes específicas (no debería ocurrir según tu modelo)
+          // Producto sin variantes específicas (no debería ocurrir)
           continue;
         }
 
@@ -540,6 +562,11 @@ exports.actualizarEstadoVenta = async (req, res) => {
         
         // Eliminar el movimiento de inventario
         await MovimientoInventario.deleteOne({ _id: movimiento._id }).session(session);
+      }
+      const cliente = await Cliente.findById(venta.cliente).session(session);
+      if (cliente) {
+        cliente.compras = cliente.compras - 1;
+        await cliente.save();
       }
     }
 
