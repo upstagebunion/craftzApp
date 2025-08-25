@@ -231,8 +231,8 @@ const actualizarProductos = async (req, res) => {
 
                 await Producto.findByIdAndUpdate(
                     _id,
-                    { $set: updateOperations }, // Usa $set para aplicar todos los cambios de una vez
-                    { new: true, runValidators: true } // `runValidators` es importante si tienes validadores en tu esquema
+                    { $set: updateOperations },
+                    { new: true, runValidators: true }
                 );
 
                 // Procesar cambios en las variantes
@@ -315,15 +315,9 @@ const actualizarProductos = async (req, res) => {
 
                 return { _id, status: 'success' };
 
-                // Actualizar todas las variantes (reemplazo completo)
-                // Esto es más eficiente que actualizar individualmente cada nivel
-                /*productoActualizado.variantes = variantes;
-                await productoActualizado.save();*/
-
             } catch (error) {
                 console.error(`Error al actualizar producto ${productoModificado._id}:`, error);
                 return { _id: productoModificado._id, status: 'failed', error: error.message };
-                // Puedes decidir si quieres continuar con otros productos o no
             }
         }));
 

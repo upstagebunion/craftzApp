@@ -21,11 +21,11 @@ const validarReferencias = async (cotizacionData) => {
   for (const producto of cotizacionData.productos) {
     if (!producto.esTemporal){
       if (!mongoose.Types.ObjectId.isValid(producto.productoRef)) {
-        throw new Error(`ID de producto no válido: ${producto.productoRef}`);
+        throw new Error(`ID de producto no válido: ${producto.nombre}`);
       }
       const productoExiste = await Producto.exists({ _id: producto.productoRef });
       if (!productoExiste) {
-        throw new Error('Producto no encontrado');
+        throw new Error(`Producto "${producto.producto.nombre}" no encontrado.`);
       }
     }
 
