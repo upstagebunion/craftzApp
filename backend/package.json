@@ -9,7 +9,7 @@
     "start": "node server.js",
     "develop": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "migrate": "node migrateCotizaciones.js"
+    "migrate": "node migrate.js"
   },
   "keywords": [],
   "author": "",
