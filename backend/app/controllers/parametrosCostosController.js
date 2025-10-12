@@ -152,7 +152,7 @@ exports.actualizarCostoElaboracion = async (req, res) => {
     }
 
     // Validar subcategorías si se proporcionan
-    if (subcategoriasAplica) {
+    /*if (subcategoriasAplica) {
       const subcategoriasValidas = await Subcategoria.find({ _id: { $in: subcategoriasAplica } });
       if (subcategoriasValidas.length !== subcategoriasAplica.length) {
         return res.status(400).json({
@@ -160,7 +160,7 @@ exports.actualizarCostoElaboracion = async (req, res) => {
           message: "Alguna subcategoría no existe"
         });
       }
-    }
+    }*/
 
     // Preparar datos para actualización
     const datosActualizacion = {
@@ -168,8 +168,37 @@ exports.actualizarCostoElaboracion = async (req, res) => {
       descripcion: descripcion !== undefined ? descripcion : costoExistente.descripcion,
       unidad: unidad || costoExistente.unidad,
       monto: monto !== undefined ? monto : costoExistente.monto,
-      subcategoriasAplica: subcategoriasAplica || costoExistente.subcategoriasAplica
+      //subcategoriasAplica: subcategoriasAplica || costoExistente.subcategoriasAplica
     };
+
+    // Manejar subcategorías - filtrar solo las que existen
+    if (subcategoriasAplica !== undefined) {
+      if (subcategoriasAplica.length === 0) {
+        datosActualizacion.subcategoriasAplica = [];
+      } else {
+        // Filtrar solo las subcategorías que existen
+        const subcategoriasValidas = await Subcategoria.find({ 
+          _id: { $in: subcategoriasAplica } 
+        });
+        
+        const idsSubcategoriasValidas = subcategoriasValidas.map(sub => sub._id.toString());
+        
+        // Encontrar las subcategorías inválidas para informar al usuario
+        const subcategoriasInvalidas = subcategoriasAplica.filter(
+          id => !idsSubcategoriasValidas.includes(id)
+        );
+
+        datosActualizacion.subcategoriasAplica = idsSubcategoriasValidas;
+
+        // Opcional: Informar sobre subcategorías filtradas
+        if (subcategoriasInvalidas.length > 0) {
+          console.warn(`Subcategorías inválidas filtradas: ${subcategoriasInvalidas.join(', ')}`);
+        }
+      }
+    } else {
+      // Si no se proporciona subcategoriasAplica, mantener las existentes
+      datosActualizacion.subcategoriasAplica = costoExistente.subcategoriasAplica;
+    }
 
     // Manejar dimensiones según unidad
     if (unidad === 'cm_cuadrado') {
