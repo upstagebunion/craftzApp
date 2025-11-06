@@ -12,11 +12,12 @@ const cotizacionesRoutes = require("./app/routes/cotizacionesRoutes");
 const extrasRoutes = require("./app/routes/extrasRoutes");
 const parametrosCostosRoutes = require("./app/routes/parametrosCostosRoutes");
 const reportesRoutes = require("./app/routes/reportesRoutes");
+const storeRoutes = require("./app/routes/storeRoutes");
 const config = require('./config');
 
 const app = express();
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://craftzapp.craftzstore.com'], // URL del frontend
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://craftzapp.craftzstore.com', 'https://craftzstore.com'], // URLs del frontend y tienda
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
 }));
@@ -40,6 +41,7 @@ app.use("/api/cotizaciones", cotizacionesRoutes);
 app.use("/api/extras", extrasRoutes);
 app.use("/api/parametrosCostos", parametrosCostosRoutes);
 app.use("/api/reportes", reportesRoutes);
+app.use("/store", storeRoutes);
 
 // Conexión a MongoDB
 mongoose.connect(config.mongoURI)

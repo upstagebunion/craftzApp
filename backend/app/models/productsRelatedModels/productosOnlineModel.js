@@ -32,7 +32,7 @@ const productoOnlineSchema = new mongoose.Schema({
     fechaActualizacion: { type: Date, default: Date.now }
 });
 
-productoOnlineSchema.index({ slug: 1 }, { unique: true });
+
 productoOnlineSchema.index({ productoBase: 1, activo: 1 });
 productoOnlineSchema.index({ categorias: 1 });
 productoOnlineSchema.index({ etiquetas: 1 });
