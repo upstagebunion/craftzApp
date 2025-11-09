@@ -17,7 +17,7 @@ const config = require('./config');
 
 const app = express();
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://craftzapp.craftzstore.com', 'https://craftzstore.com'], // URLs del frontend y tienda
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'https://craftzapp.craftzstore.com', 'https://craftzstore.com', 'https://new.craftzstore.com'], // URLs del frontend y tienda
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
 }));
