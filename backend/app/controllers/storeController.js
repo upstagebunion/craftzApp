@@ -1,5 +1,6 @@
 const ProductoOnline = require('../models/productsRelatedModels/productosOnlineModel');
 const { Categoria } = require('../models/categoriasModel');
+const Producto = require('../models/productsRelatedModels/productosModel');
 const CategoriasDisenos = require('../models/categoriasDisenos');
 
 const obtenerProductosPublicos = async (req, res) => {
@@ -24,7 +25,7 @@ const obtenerProductosPublicos = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit))
       .populate('categorias', 'nombre')
-      .select('slug nombre descripcionCorta precioMinimo precioMaximo imagenes destacado etiquetas')
+      .populate('productoBase', 'nombre')
       .sort({ destacado: -1, fechaCreacion: -1 });
 
     const total = await ProductoOnline.countDocuments(filtro);
