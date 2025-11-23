@@ -1,8 +1,8 @@
-craftzapp/node_modules
-./craftzapp/node_modules
-/craftzapp/node_modules/
-craftzapp/node_modules/
-./craftzapp/node_modules/
-/craftzapp/node_modules
+node_modules/
 backend/node_modules/
+craftzapp/node_modules/
+craftzapp/
 backend/.env
+.env
+*.log
+.DS_Store
